@@ -1,1 +1,25 @@
-{\n  "name": "baomatiot-gdpr",\n  "version": "1.0.0",\n  "scripts": {\n    "start": "node server.js",\n    "build": "echo 'Building...'",\n    "test": "echo 'Testing...'",\n    "dev": "nodemon server.js"\n  },\n  "dependencies": {\n    "express": "^4.17.1",\n    "jsonwebtoken": "^8.5.1",\n    "nodemailer": "^6.4.11",\n    "mqtt": "^4.3.7",\n    "dotenv": "^10.0.0"\n  }\n}
+{
+  "name": "baomatiot-gdpr",
+  "version": "1.0.0",
+  "description": "IoT GDPR Healthcare backend + static frontend for Azure Static Web Apps",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js",
+    "dev": "nodemon api/index.js",
+    "build": "echo \"No build required for static frontend and Node API\"",
+    "test": "node tests/run-tests.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mqtt": "^5.10.4",
+    "nodemailer": "^6.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
