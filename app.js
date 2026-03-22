@@ -26,7 +26,12 @@ async function api(path, options = {}) {
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const response = await fetch(path, { ...options, headers });
-  const data = await response.json().catch(() => ({}));
+  let data = {};
+  try {
+    data = await response.json();
+  } catch (error) {
+    console.error('Failed to parse API response JSON', error);
+  }
   if (!response.ok) {
     throw new Error(data.error || `Request failed: ${response.status}`);
   }

@@ -13,26 +13,31 @@ function toPublicUser(user) {
 }
 
 function hashPassword(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
 }
 
-function seedAdminIfMissing(data) {
-  const existing = data.users.find((u) => u.email.toLowerCase() === defaultAdminEmail);
-  if (!existing) {
-    data.users.push({
-      id: crypto.randomUUID(),
-      email: defaultAdminEmail,
-      passwordHash: hashPassword('admin123'),
-      role: 'admin',
-      createdAt: new Date().toISOString()
-    });
-    writeData(data);
+function verifyPassword(password, storedHash) {
+  if (typeof storedHash !== 'string') {
+    return false;
   }
+
+  const parts = storedHash.split('$');
+  if (parts.length === 3 && parts[0] === 'scrypt') {
+    const [, salt, hash] = parts;
+    const computed = crypto.scryptSync(password, salt, 64).toString('hex');
+    return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(hash, 'hex'));
+  }
+
+  // Backward-compatible fallback for legacy SHA-256 hashes.
+  const legacy = crypto.createHash('sha256').update(password).digest('hex');
+  return storedHash === legacy;
 }
 
 function ensureSeededAdmin() {
-  const data = readData();
-  seedAdminIfMissing(data);
+  // No-op: admin role is assigned by email at account creation/login.
+  // Kept for compatibility with existing imports.
 }
 
 function validateEmail(email) {
@@ -45,7 +50,6 @@ function validateEmail(email) {
 
 function findOrCreateUser(email, password) {
   const data = readData();
-  seedAdminIfMissing(data);
 
   const normalizedEmail = email.trim().toLowerCase();
   let user = data.users.find((u) => u.email.toLowerCase() === normalizedEmail);
@@ -63,8 +67,7 @@ function findOrCreateUser(email, password) {
     return user;
   }
 
-  const passwordHash = hashPassword(password);
-  if (user.passwordHash !== passwordHash) {
+  if (!verifyPassword(password, user.passwordHash)) {
     return null;
   }
 
@@ -73,19 +76,16 @@ function findOrCreateUser(email, password) {
 
 function getUserById(userId) {
   const data = readData();
-  seedAdminIfMissing(data);
   return data.users.find((u) => u.id === userId) || null;
 }
 
 function getAllUsers() {
   const data = readData();
-  seedAdminIfMissing(data);
   return data.users.map(toPublicUser);
 }
 
 function promoteUser(userId) {
   const data = readData();
-  seedAdminIfMissing(data);
 
   const user = data.users.find((u) => u.id === userId);
   if (!user) {

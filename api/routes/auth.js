@@ -1,12 +1,13 @@
 const express = require('express');
 const { requireFields } = require('../middleware/validation');
 const { authMiddleware } = require('../middleware/auth');
+const { authRateLimit } = require('../middleware/rateLimit');
 const { validateEmail, findOrCreateUser, toPublicUser } = require('../services/userService');
 const { signToken } = require('../services/authService');
 
 const router = express.Router();
 
-router.post('/login', requireFields(['email', 'password']), (req, res) => {
+router.post('/login', authRateLimit, requireFields(['email', 'password']), (req, res) => {
   const { email, password } = req.body;
 
   if (!validateEmail(email) || typeof password !== 'string' || password.length < 6) {
@@ -22,7 +23,7 @@ router.post('/login', requireFields(['email', 'password']), (req, res) => {
   return res.json({ token, user: toPublicUser(user) });
 });
 
-router.get('/me', authMiddleware, (req, res) => {
+router.get('/me', authRateLimit, authMiddleware, (req, res) => {
   return res.json({ user: toPublicUser(req.user) });
 });
 
