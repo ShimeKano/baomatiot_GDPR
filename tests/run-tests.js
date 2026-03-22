@@ -22,6 +22,8 @@ const emailService = require('../api/services/emailService');
   userService.ensureSeededAdmin();
   const admin = userService.findOrCreateUser('22004249@st.vlute.edu.vn', 'admin123');
   assert(admin && admin.role === 'admin', 'Default admin should be admin');
+  const adminWrongPassword = userService.findOrCreateUser('22004249@st.vlute.edu.vn', 'otherpass');
+  assert(adminWrongPassword === null, 'Authentication with different password should fail after admin account is created');
 
   const user = userService.findOrCreateUser('user@example.com', 'user123');
   assert(user && user.role === 'user', 'Non-admin email should default to user');
