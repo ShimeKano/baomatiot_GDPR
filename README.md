@@ -7,6 +7,7 @@ This project provides a complete Node.js/Express API under `/api` and a static f
 - Email login with JWT-based authentication.
 - Role model:
   - Default admin email: `22004249@st.vlute.edu.vn`
+  - There is no hard-coded default admin password. On first successful login with the default admin email, the submitted password becomes that account password.
   - Any other email defaults to role `user`
   - Admin can promote users to admin.
 - Auth + role middleware for protected endpoints.
