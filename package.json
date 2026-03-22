@@ -1,0 +1,1 @@
+{\n  "name": "baomatiot-gdpr",\n  "version": "1.0.0",\n  "scripts": {\n    "start": "node server.js",\n    "build": "echo 'Building...'",\n    "test": "echo 'Testing...'",\n    "dev": "nodemon server.js"\n  },\n  "dependencies": {\n    "express": "^4.17.1",\n    "jsonwebtoken": "^8.5.1",\n    "nodemailer": "^6.4.11",\n    "mqtt": "^4.3.7",\n    "dotenv": "^10.0.0"\n  }\n}
