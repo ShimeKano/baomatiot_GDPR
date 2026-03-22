@@ -5,40 +5,112 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>IoT GDPR Healthcare</title>
   <link rel="stylesheet" href="/styles.css" />
+  <!-- Chart.js for data visualisation -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <main class="container">
-    <h1>IoT GDPR Healthcare Dashboard</h1>
 
-    <section id="loginSection" class="card">
-      <h2>Login</h2>
-      <form id="loginForm">
-        <label>Email <input id="email" type="email" required /></label>
-        <label>Password <input id="password" type="password" minlength="6" required /></label>
-        <button type="submit">Login</button>
-      </form>
-      <p class="hint">Default admin email: 22004249@st.vlute.edu.vn</p>
-    </section>
+  <!-- ── LOGIN PAGE ────────────────────────────────────────── -->
+  <section id="loginSection">
+    <div class="login-wrapper">
+      <div class="login-card">
+        <div class="login-header">
+          <div class="login-icon">&#x2764;&#xFE0F;</div>
+          <h1>IoT Healthcare</h1>
+          <p>GDPR-compliant sensor dashboard</p>
+        </div>
+        <div class="login-body">
+          <form id="loginForm">
+            <div class="field-group">
+              <label for="email">Email address</label>
+              <input id="email" type="email" placeholder="you@example.com" required autocomplete="username" />
+            </div>
+            <div class="field-group">
+              <label for="password">Password</label>
+              <input id="password" type="password" placeholder="Min. 6 characters" minlength="6" required autocomplete="current-password" />
+            </div>
+            <button type="submit" class="btn-primary btn-full" id="loginBtn">Sign In</button>
+          </form>
+          <p class="hint">Default admin: <strong>22004249@st.vlute.edu.vn</strong></p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    <section id="dashboardSection" class="card hidden">
-      <h2>Dashboard</h2>
-      <p id="meInfo"></p>
+  <!-- ── DASHBOARD PAGE ─────────────────────────────────────── -->
+  <section id="dashboardSection" class="hidden">
 
-      <div class="row">
-        <button id="loadSummaryBtn">Load Daily Summary</button>
-        <button id="logoutBtn">Logout</button>
+    <!-- Top navigation bar -->
+    <header class="topbar">
+      <div class="topbar-brand">
+        <span class="topbar-icon">&#x2764;&#xFE0F;</span>
+        <span class="topbar-title">IoT Healthcare Dashboard</span>
+      </div>
+      <div class="topbar-user">
+        <span id="meInfo" class="user-chip"></span>
+        <button id="logoutBtn" class="btn-ghost">Logout</button>
+      </div>
+    </header>
+
+    <main class="dash-content">
+
+      <!-- KPI summary cards (populated by JS after load) -->
+      <div id="kpiCards" class="kpi-grid hidden"></div>
+
+      <!-- Charts section -->
+      <div id="chartsSection" class="hidden">
+        <div class="card chart-card">
+          <div class="chart-header">
+            <h3>Health Trends — Today</h3>
+            <button id="loadSummaryBtn" class="btn-secondary">&#x21BB; Refresh</button>
+          </div>
+          <div class="chart-grid">
+            <div class="chart-wrap">
+              <canvas id="chartTemp" aria-label="Temperature chart"></canvas>
+              <p class="chart-label">🌡 Temperature (°C)</p>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="chartHR" aria-label="Heart rate chart"></canvas>
+              <p class="chart-label">💓 Heart Rate (bpm)</p>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="chartSpo2" aria-label="SpO2 chart"></canvas>
+              <p class="chart-label">🩸 SpO2 (%)</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <pre id="summaryOutput"></pre>
+      <!-- Empty state shown when no data yet -->
+      <div id="emptyState" class="card empty-state hidden">
+        <div class="empty-icon">📡</div>
+        <h3>No sensor data for today</h3>
+        <p>Connect your IoT device and publish readings to see health trends here.</p>
+        <button id="loadSummaryBtnEmpty" class="btn-primary">Load Summary</button>
+      </div>
 
+      <!-- Initial prompt before first load -->
+      <div id="summaryPrompt" class="card empty-state">
+        <div class="empty-icon">📊</div>
+        <h3>Welcome to your health dashboard</h3>
+        <p>Click the button below to load today's health summary and charts.</p>
+        <button id="loadSummaryBtnPrompt" class="btn-primary">Load Daily Summary</button>
+      </div>
+
+      <!-- Admin section -->
       <div id="adminControls" class="hidden">
-        <h3>Admin Actions</h3>
-        <button id="listUsersBtn">List Users</button>
-        <button id="sendDailyEmailsBtn">Send Daily Emails</button>
-        <pre id="adminOutput"></pre>
+        <div class="card">
+          <h3 class="section-title">&#x1F6E1; Admin Actions</h3>
+          <div class="row">
+            <button id="listUsersBtn" class="btn-secondary">List Users</button>
+            <button id="sendDailyEmailsBtn" class="btn-secondary">Send Daily Emails</button>
+          </div>
+          <pre id="adminOutput"></pre>
+        </div>
       </div>
-    </section>
-  </main>
+
+    </main>
+  </section>
 
   <script src="/app.js"></script>
 </body>
