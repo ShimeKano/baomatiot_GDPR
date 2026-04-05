@@ -54,6 +54,39 @@
 
     <main class="dash-content">
 
+      <!-- Device Token & MQTT setup card -->
+      <div id="deviceTokenSection" class="card device-token-card">
+        <h3 class="section-title">&#x1F4F1; IoT Device Setup (Wokwi / MQTT)</h3>
+        <div class="device-token-body">
+          <div class="device-token-row">
+            <span class="dt-label">MQTT Broker:</span>
+            <code id="dtBroker" class="dt-value">—</code>
+          </div>
+          <div class="device-token-row">
+            <span class="dt-label">MQTT Topic:</span>
+            <code id="dtTopic" class="dt-value">—</code>
+          </div>
+          <div class="device-token-row">
+            <span class="dt-label">Device Token:</span>
+            <code id="dtToken" class="dt-value dt-token">—</code>
+            <button id="copyTokenBtn" class="btn-ghost btn-sm" title="Copy token">&#x1F4CB;</button>
+          </div>
+          <p class="dt-hint">Include your device token in every MQTT message as <code>deviceToken</code>. Keep it secret — anyone with the token can write to your account.</p>
+          <button id="rotateTokenBtn" class="btn-secondary btn-sm">&#x21BB; Generate / Rotate Token</button>
+        </div>
+      </div>
+
+      <!-- Latest telemetry readings -->
+      <div id="telemetrySection" class="card">
+        <div class="chart-header">
+          <h3>&#x1F4E1; Latest Telemetry Readings</h3>
+          <button id="refreshTelemetryBtn" class="btn-secondary">&#x21BB; Refresh</button>
+        </div>
+        <div id="telemetryTableWrap">
+          <p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>
+        </div>
+      </div>
+
       <!-- KPI summary cards (populated by JS after load) -->
       <div id="kpiCards" class="kpi-grid hidden"></div>
 

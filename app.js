@@ -87,6 +87,8 @@ function setUiAuthenticated(user) {
   dashboardSection.classList.remove('hidden');
   meInfo.textContent = `${user.email}  •  ${user.role}`;
   adminControls.classList.toggle('hidden', user.role !== 'admin');
+  loadDeviceToken();
+  loadTelemetry();
 }
 
 function setUiLoggedOut() {
@@ -99,6 +101,15 @@ function setUiLoggedOut() {
   summaryPrompt.classList.remove('hidden');
   kpiCards.innerHTML = '';
   destroyCharts();
+  // Reset device token UI
+  const dtToken = document.getElementById('dtToken');
+  const dtBroker = document.getElementById('dtBroker');
+  const dtTopic = document.getElementById('dtTopic');
+  if (dtToken) dtToken.textContent = '—';
+  if (dtBroker) dtBroker.textContent = '—';
+  if (dtTopic) dtTopic.textContent = '—';
+  const telemetryWrap = document.getElementById('telemetryTableWrap');
+  if (telemetryWrap) telemetryWrap.innerHTML = '<p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>';
 }
 
 // ── Chart helpers ────────────────────────────────────────────
@@ -220,7 +231,89 @@ function renderSummaryUI(day, summaries) {
   chartSpo2 = buildGauge('chartSpo2', avgSpo2 !== null ? parseFloat(avgSpo2) : null, 100, '#06b6d4');
 }
 
+// ── Device Token & Telemetry ─────────────────────────────────
+
+async function loadDeviceToken() {
+  try {
+    const result = await api('/api/telemetry/token');
+    const dtToken = document.getElementById('dtToken');
+    const dtBroker = document.getElementById('dtBroker');
+    const dtTopic = document.getElementById('dtTopic');
+    if (dtBroker) dtBroker.textContent = result.mqttBroker || '—';
+    if (dtTopic) dtTopic.textContent = result.mqttTopic || '—';
+    if (dtToken) dtToken.textContent = result.deviceToken || '(none — click Generate)';
+  } catch (error) {
+    console.error('Failed to load device token', error);
+  }
+}
+
+async function rotateDeviceToken() {
+  try {
+    const result = await api('/api/telemetry/token', { method: 'POST' });
+    const dtToken = document.getElementById('dtToken');
+    const dtBroker = document.getElementById('dtBroker');
+    const dtTopic = document.getElementById('dtTopic');
+    if (dtBroker) dtBroker.textContent = result.mqttBroker || '—';
+    if (dtTopic) dtTopic.textContent = result.mqttTopic || '—';
+    if (dtToken) dtToken.textContent = result.deviceToken;
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+function renderTelemetryTable(records) {
+  const wrap = document.getElementById('telemetryTableWrap');
+  if (!wrap) return;
+  if (!records || !records.length) {
+    wrap.innerHTML = '<p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>';
+    return;
+  }
+  const rows = records.map((r) => `
+    <tr>
+      <td>${new Date(r.timestamp).toLocaleString()}</td>
+      <td>${r.deviceId || '—'}</td>
+      <td>${r.temperature !== null ? `${r.temperature} °C` : '—'}</td>
+      <td>${r.humidity !== null ? `${r.humidity} %` : '—'}</td>
+      <td>${r.heartRate !== null ? `${r.heartRate} bpm` : '—'}</td>
+      <td>${r.spo2 !== null ? `${r.spo2} %` : '—'}</td>
+    </tr>`).join('');
+  wrap.innerHTML = `
+    <table class="telemetry-table">
+      <thead>
+        <tr>
+          <th>Time</th><th>Device</th><th>Temp</th><th>Humidity</th><th>Heart Rate</th><th>SpO2</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+async function loadTelemetry() {
+  try {
+    const result = await api('/api/telemetry?limit=20');
+    renderTelemetryTable(result.records);
+  } catch (error) {
+    console.error('Failed to load telemetry', error);
+  }
+}
+
 // ── Event listeners ──────────────────────────────────────────
+
+document.getElementById('rotateTokenBtn').addEventListener('click', rotateDeviceToken);
+
+document.getElementById('copyTokenBtn').addEventListener('click', () => {
+  const tokenEl = document.getElementById('dtToken');
+  const text = tokenEl ? tokenEl.textContent : '';
+  if (text && text !== '—' && text !== '(none — click Generate)') {
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyTokenBtn');
+      btn.textContent = '✅';
+      setTimeout(() => { btn.textContent = '📋'; }, 1500);
+    });
+  }
+});
+
+document.getElementById('refreshTelemetryBtn').addEventListener('click', loadTelemetry);
 
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
