@@ -59,6 +59,31 @@ function enqueueWrite(userId, fn) {
   return writeQueues[safe];
 }
 
+function safeIsoTimestamp(value) {
+  if (value === undefined || value === null || value === '') {
+    return new Date().toISOString();
+  }
+
+  // If device sends epoch seconds or milliseconds as number/string:
+  // - 10 digits -> seconds
+  // - 13 digits -> milliseconds
+  if (typeof value === 'number' || (typeof value === 'string' && /^[0-9]+$/.test(value))) {
+    const n = Number(value);
+    if (Number.isFinite(n)) {
+      const ms = n < 1e12 ? n * 1000 : n;
+      const d = new Date(ms);
+      if (Number.isFinite(d.getTime())) return d.toISOString();
+    }
+  }
+
+  // Otherwise try Date parse (ISO string, RFC, etc.)
+  const d = new Date(value);
+  if (!Number.isFinite(d.getTime())) {
+    return new Date().toISOString();
+  }
+  return d.toISOString();
+}
+
 function ingestTelemetry(userId, payload) {
   const record = {
     id: crypto.randomUUID(),
@@ -68,7 +93,10 @@ function ingestTelemetry(userId, payload) {
     humidity: Number.isFinite(Number(payload.humidity)) ? Number(payload.humidity) : null,
     heartRate: Number.isFinite(Number(payload.heartRate)) ? Number(payload.heartRate) : null,
     spo2: Number.isFinite(Number(payload.spo2)) ? Number(payload.spo2) : null,
-    timestamp: payload.timestamp ? new Date(payload.timestamp).toISOString() : new Date().toISOString(),
+
+    // FIX: never crash on invalid timestamp
+    timestamp: safeIsoTimestamp(payload.timestamp),
+
     createdAt: new Date().toISOString()
   };
 
