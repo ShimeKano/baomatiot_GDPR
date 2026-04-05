@@ -106,11 +106,11 @@ void publishTelemetry() {
 
   // Simulated heart rate: potentiometer maps 0–4095 → 50–180 bpm
   int rawHR   = analogRead(HR_PIN);
-  float heartRate = map(rawHR, 0, 4095, 50, 180);
+  float heartRate = 50.0f + (rawHR / 4095.0f) * (180.0f - 50.0f);
 
   // Simulated SpO2: potentiometer maps 0–4095 → 90–100 %
   int rawSpO2 = analogRead(SPO2_PIN);
-  float spo2  = map(rawSpO2, 0, 4095, 90, 100);
+  float spo2  = 90.0f + (rawSpO2 / 4095.0f) * (100.0f - 90.0f);
 
   // Build JSON payload
   StaticJsonDocument<256> doc;

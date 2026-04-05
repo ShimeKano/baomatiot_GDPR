@@ -10,6 +10,8 @@ const telemetryDir = path.resolve(
 // Write-queue per userId to prevent interleaved atomic writes
 const writeQueues = {};
 
+const DEFAULT_DEVICE_ID = 'wokwi';
+
 function ensureDir() {
   if (!fs.existsSync(telemetryDir)) {
     fs.mkdirSync(telemetryDir, { recursive: true });
@@ -61,7 +63,7 @@ function ingestTelemetry(userId, payload) {
   const record = {
     id: crypto.randomUUID(),
     userId,
-    deviceId: typeof payload.deviceId === 'string' ? payload.deviceId.trim() : 'wokwi',
+    deviceId: typeof payload.deviceId === 'string' ? payload.deviceId.trim() : DEFAULT_DEVICE_ID,
     temperature: Number.isFinite(Number(payload.temperature)) ? Number(payload.temperature) : null,
     humidity: Number.isFinite(Number(payload.humidity)) ? Number(payload.humidity) : null,
     heartRate: Number.isFinite(Number(payload.heartRate)) ? Number(payload.heartRate) : null,

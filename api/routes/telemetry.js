@@ -6,8 +6,14 @@ const { getTelemetry } = require('../services/telemetryService');
 
 const router = express.Router();
 
+const DEFAULT_MQTT_BROKER = 'mqtt://test.mosquitto.org';
+
 function mqttTopic() {
   return process.env.MQTT_TELEMETRY_TOPIC || 'iot/gdpr/telemetry';
+}
+
+function mqttBroker() {
+  return process.env.MQTT_BROKER_URL || DEFAULT_MQTT_BROKER;
 }
 
 // POST /api/telemetry/token — create or rotate device token for authenticated user
@@ -16,7 +22,7 @@ router.post('/token', sensitiveRateLimit, authMiddleware, (req, res) => {
     const result = createOrRotateDeviceToken(req.user.id);
     return res.json({
       deviceToken: result.token,
-      mqttBroker: process.env.MQTT_BROKER_URL || 'mqtt://test.mosquitto.org',
+      mqttBroker: mqttBroker(),
       mqttTopic: mqttTopic(),
       createdAt: result.createdAt
     });
@@ -33,13 +39,13 @@ router.get('/token', sensitiveRateLimit, authMiddleware, (req, res) => {
     if (!result) {
       return res.json({
         deviceToken: null,
-        mqttBroker: process.env.MQTT_BROKER_URL || 'mqtt://test.mosquitto.org',
+        mqttBroker: mqttBroker(),
         mqttTopic: mqttTopic()
       });
     }
     return res.json({
       deviceToken: result.token,
-      mqttBroker: process.env.MQTT_BROKER_URL || 'mqtt://test.mosquitto.org',
+      mqttBroker: mqttBroker(),
       mqttTopic: mqttTopic(),
       createdAt: result.createdAt
     });
