@@ -16,19 +16,14 @@ jobs:
     name: Build and Deploy
     permissions:
       contents: read
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: true
-          lfs: false
 
-      - name: Build and Deploy to Azure Static Web Apps
-        id: swa
+      - name: Deploy
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.045fbe11f813ecc48ddf95493a1941b6c3deb3a3492a5cf782a984ec42a912df01-38b7f50c-4145-4230-80c5-7c0398b10a2b000000509a048600 }}
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_ASHY_COAST_09A048600 }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: "/"
@@ -39,9 +34,9 @@ jobs:
   close_pull_request:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
-    name: Close Pull Request Preview Environment
+    name: Close Pull Request Preview
     steps:
-      - name: Close Pull Request Preview
+      - name: Close
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_ASHY_COAST_09A048600 }}
