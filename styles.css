@@ -284,6 +284,78 @@ pre {
   color: var(--text);
 }
 
+/* ── DEVICE TOKEN CARD ───────────────────────────────────── */
+.device-token-card { margin-bottom: 24px; }
+
+.device-token-body { display: flex; flex-direction: column; gap: 10px; }
+
+.device-token-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dt-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  min-width: 110px;
+  font-weight: 600;
+}
+
+.dt-value {
+  font-size: 0.85rem;
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.dt-token {
+  font-family: monospace;
+  letter-spacing: 0.05em;
+  max-width: 480px;
+}
+
+.dt-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 4px 0;
+}
+
+.btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+/* ── TELEMETRY TABLE ─────────────────────────────────────── */
+.telemetry-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  margin-top: 8px;
+}
+
+.telemetry-table th,
+.telemetry-table td {
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.telemetry-table th {
+  font-weight: 600;
+  color: var(--muted);
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+}
+
+.telemetry-table tbody tr:hover { background: #f1f5f9; }
+
+#telemetryTableWrap {
+  max-height: 320px;
+  overflow-y: auto;
+  border-radius: 6px;
+}
+
 /* ── RESPONSIVE ──────────────────────────────────────────── */
 @media (max-width: 600px) {
   .topbar { padding: 0 16px; }
