@@ -11,6 +11,9 @@ const { ensureSeededAdmin } = require('./services/userService');
 
 const app = express();
 
+// FIX for Azure/App Service behind reverse proxy (prevents express-rate-limit error)
+app.set('trust proxy', 1);
+
 ensureSeededAdmin();
 
 app.use(express.json({ limit: '256kb' }));
