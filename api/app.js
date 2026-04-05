@@ -5,10 +5,14 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const sensorRoutes = require('./routes/sensors');
 const adminRoutes = require('./routes/admin');
+const telemetryRoutes = require('./routes/telemetry');
 const { staticRateLimit } = require('./middleware/rateLimit');
 const { ensureSeededAdmin } = require('./services/userService');
 
 const app = express();
+
+// FIX for Azure/App Service behind reverse proxy (prevents express-rate-limit error)
+app.set('trust proxy', 1);
 
 ensureSeededAdmin();
 
@@ -22,6 +26,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/sensors', sensorRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/telemetry', telemetryRoutes);
 
 app.use(staticRateLimit);
 app.use(express.static(path.resolve(process.cwd())));

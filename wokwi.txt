@@ -1,0 +1,167 @@
+/*
+ * Wokwi ESP32 – IoT GDPR Healthcare Telemetry
+ * ============================================
+ * Copy-paste this code into your Wokwi sketch.ino editor.
+ *
+ * Steps:
+ *  1. Open https://wokwi.com/projects/new/esp32
+ *  2. Click the "sketch.ino" tab.
+ *  3. Select all and delete the existing code.
+ *  4. Paste this entire file.
+ *  5. Replace YOUR_DEVICE_TOKEN_HERE with your token from the dashboard
+ *     (Dashboard → IoT Device Setup card → Generate / Rotate Token).
+ *  6. Click ▶ Start Simulation.
+ *
+ * Required Wokwi libraries (add in diagram.json or via Library Manager):
+ *  - PubSubClient   (Nick O'Leary)
+ *  - DHT sensor library (Adafruit) + Adafruit Unified Sensor
+ *
+ * Wired components in diagram.json:
+ *  - wokwi-dht22   → DATA pin to GPIO 4
+ *  - (Heartrate/SpO2 simulated with potentiometers on GPIO 34 & 35)
+ *
+ * MQTT broker: test.mosquitto.org (free, no credentials)
+ * Topic:       iot/gdpr/telemetry
+ * Payload:     JSON with deviceToken + sensor readings
+ */
+
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <DHT.h>
+#include <ArduinoJson.h>
+
+// ── Configuration ──────────────────────────────────────────────
+// Wokwi provides a simulated WiFi; use these credentials as-is.
+const char* WIFI_SSID     = "Wokwi-GUEST";
+const char* WIFI_PASSWORD = "";
+
+// Replace with the token shown in your dashboard
+const char* DEVICE_TOKEN  = "YOUR_DEVICE_TOKEN_HERE";
+
+// MQTT broker (free public, no auth)
+const char* MQTT_BROKER   = "test.mosquitto.org";
+const int   MQTT_PORT     = 1883;
+const char* MQTT_TOPIC    = "iot/gdpr/telemetry";
+
+// Device identifier (arbitrary; helps you distinguish multiple devices)
+const char* DEVICE_ID     = "esp32-wokwi-1";
+
+// DHT22 sensor on GPIO 4
+#define DHTPIN  4
+#define DHTTYPE DHT22
+
+// Simulated heart-rate & SpO2 potentiometers (ADC pins)
+#define HR_PIN   34
+#define SPO2_PIN 35
+
+// Publish interval (milliseconds)
+const unsigned long PUBLISH_INTERVAL_MS = 10000; // every 10 seconds
+// ────────────────────────────────────────────────────────────────
+
+DHT dht(DHTPIN, DHTTYPE);
+WiFiClient   espClient;
+PubSubClient mqttClient(espClient);
+
+unsigned long lastPublish = 0;
+
+// ── WiFi ────────────────────────────────────────────────────────
+void connectWiFi() {
+  Serial.print("Connecting to WiFi");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) {
+    delay(500);
+    Serial.print(".");
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi connected. IP: " + WiFi.localIP().toString());
+  } else {
+    Serial.println("\nWiFi connection failed — will retry.");
+  }
+}
+
+// ── MQTT ────────────────────────────────────────────────────────
+void connectMQTT() {
+  mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+  // Unique client ID to avoid collisions on public broker
+  String clientId = "iot-gdpr-" + String(DEVICE_ID) + "-" + String(random(0xFFFF), HEX);
+
+  Serial.print("Connecting to MQTT broker " + String(MQTT_BROKER) + "...");
+  unsigned long start = millis();
+  while (!mqttClient.connected() && millis() - start < 10000) {
+    if (mqttClient.connect(clientId.c_str())) {
+      Serial.println(" connected.");
+    } else {
+      Serial.print(" failed (state=" + String(mqttClient.state()) + "), retrying...");
+      delay(2000);
+    }
+  }
+}
+
+// ── Publish telemetry ───────────────────────────────────────────
+void publishTelemetry() {
+  // Read DHT22
+  float temperature = dht.readTemperature();
+  float humidity    = dht.readHumidity();
+
+  // Simulated heart rate: potentiometer maps 0–4095 → 50–180 bpm
+  int rawHR   = analogRead(HR_PIN);
+  float heartRate = 50.0f + (rawHR / 4095.0f) * (180.0f - 50.0f);
+
+  // Simulated SpO2: potentiometer maps 0–4095 → 90–100 %
+  int rawSpO2 = analogRead(SPO2_PIN);
+  float spo2  = 90.0f + (rawSpO2 / 4095.0f) * (100.0f - 90.0f);
+
+  // Build JSON payload
+  StaticJsonDocument<256> doc;
+  doc["deviceToken"] = DEVICE_TOKEN;
+  doc["deviceId"]    = DEVICE_ID;
+
+  if (!isnan(temperature)) doc["temperature"] = round(temperature * 10.0) / 10.0;
+  if (!isnan(humidity))    doc["humidity"]    = round(humidity * 10.0) / 10.0;
+  doc["heartRate"] = (int)heartRate;
+  doc["spo2"]      = (int)spo2;
+
+  char payload[256];
+  serializeJson(doc, payload);
+
+  Serial.println("Publishing: " + String(payload));
+
+  if (mqttClient.publish(MQTT_TOPIC, payload)) {
+    Serial.println("✓ Published to " + String(MQTT_TOPIC));
+  } else {
+    Serial.println("✗ Publish failed");
+  }
+}
+
+// ── Arduino entry points ────────────────────────────────────────
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+  dht.begin();
+
+  Serial.println("\n=== IoT GDPR Healthcare — Wokwi ESP32 ===");
+  connectWiFi();
+  connectMQTT();
+}
+
+void loop() {
+  // Keep MQTT connection alive
+  if (!mqttClient.connected()) {
+    Serial.println("MQTT disconnected — reconnecting...");
+    connectMQTT();
+  }
+  mqttClient.loop();
+
+  // Reconnect WiFi if lost
+  if (WiFi.status() != WL_CONNECTED) {
+    connectWiFi();
+  }
+
+  // Publish at regular interval
+  unsigned long now = millis();
+  if (now - lastPublish >= PUBLISH_INTERVAL_MS) {
+    lastPublish = now;
+    publishTelemetry();
+  }
+}

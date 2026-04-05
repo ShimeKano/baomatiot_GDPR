@@ -1,1 +1,0 @@
-hệ thống bảo mật iot GDPR heal care bằng cảm biến wokwwi sử dụng azure làm cloud và loing bằng mail accout phân quyền admin là mail 22004249@st.vlute.edu.vn. các mail khá đăng nhập vào mặt định sẽ là người dùng. có thể được nâng cắp bởi admin. hệ thống có chức năng gửi mail cho người dùng mỗi ngày một lần tổng hợp các chỉ số trung bình của cảm biến đo được. sử dụng broker có sẳn 
