@@ -1,4 +1,11 @@
 const tokenKey = 'iot_gdpr_token';
+const apiBaseKey = 'iot_gdpr_api_base';
+
+// Nếu bạn có App Service API, điền vào đây (ví dụ: https://iotgdpr-api.azurewebsites.net)
+// Để rỗng thì:
+// - local => dùng /api
+// - azurestaticapps => vẫn dùng /api (sẽ lỗi nếu không có SWA Functions)
+const DEFAULT_CLOUD_API_BASE = '';
 
 const loginSection = document.getElementById('loginSection');
 const dashboardSection = document.getElementById('dashboardSection');
@@ -28,22 +35,51 @@ function clearToken() {
   localStorage.removeItem(tokenKey);
 }
 
+function getApiBase() {
+  const fromStorage = (localStorage.getItem(apiBaseKey) || '').trim();
+  if (fromStorage) return fromStorage.replace(/\/+$/, '');
+
+  // Nếu chạy trên SWA domain mà có backend rời, bạn nên set DEFAULT_CLOUD_API_BASE
+  if (window.location.hostname.includes('azurestaticapps.net')) {
+    return DEFAULT_CLOUD_API_BASE.replace(/\/+$/, '');
+  }
+
+  // local/dev mặc định dùng same-origin
+  return '';
+}
+
+function buildApiUrl(path) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const base = getApiBase();
+  return base ? `${base}${normalizedPath}` : normalizedPath;
+}
+
 async function api(path, options = {}) {
   const token = getToken();
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetch(path, { ...options, headers });
-  let data = {};
-  try {
-    data = await response.json();
-  } catch (error) {
-    console.error('Failed to parse API response JSON', error);
+  const url = buildApiUrl(path);
+  const response = await fetch(url, { ...options, headers });
+
+  const raw = await response.text();
+  let data = null;
+
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch (error) {
+      console.error('Failed to parse API response JSON', error, { url, status: response.status, raw });
+      throw new Error(`API trả về dữ liệu không phải JSON (HTTP ${response.status})`);
+    }
   }
+
   if (!response.ok) {
-    throw new Error(data.error || `Request failed: ${response.status}`);
+    const msg = (data && (data.error || data.message)) || `Request failed: ${response.status}`;
+    throw new Error(msg);
   }
-  return data;
+
+  return data ?? {};
 }
 
 function setUiAuthenticated(user) {
@@ -75,7 +111,9 @@ function destroyCharts() {
 
 /* Build a gauge-style doughnut chart for a single average value */
 function buildGauge(canvasId, value, max, color) {
-  const ctx = document.getElementById(canvasId).getContext('2d');
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return null;
+  const ctx = canvas.getContext('2d');
   const filled = value !== null ? Math.min(value, max) : 0;
   const remaining = max - filled;
   return new Chart(ctx, {
@@ -123,9 +161,9 @@ function renderSummaryUI(day, summaries) {
     }
   });
 
-  const avgTemp = tempN  ? (tempSum  / tempN).toFixed(1)  : null;
-  const avgHR   = hrN    ? (hrSum    / hrN).toFixed(0)    : null;
-  const avgSpo2 = spo2N  ? (spo2Sum  / spo2N).toFixed(1) : null;
+  const avgTemp = tempN ? (tempSum / tempN).toFixed(1) : null;
+  const avgHR = hrN ? (hrSum / hrN).toFixed(0) : null;
+  const avgSpo2 = spo2N ? (spo2Sum / spo2N).toFixed(1) : null;
 
   // Hide prompt, show appropriate sections
   summaryPrompt.classList.add('hidden');
@@ -177,7 +215,7 @@ function renderSummaryUI(day, summaries) {
   // Temp gauge: 0–45 °C range
   chartTemp = buildGauge('chartTemp', avgTemp !== null ? parseFloat(avgTemp) : null, 45, '#f59e0b');
   // Heart rate gauge: 0–200 bpm range
-  chartHR   = buildGauge('chartHR',   avgHR   !== null ? parseFloat(avgHR)   : null, 200, '#ef4444');
+  chartHR = buildGauge('chartHR', avgHR !== null ? parseFloat(avgHR) : null, 200, '#ef4444');
   // SpO2 gauge: 0–100 % range
   chartSpo2 = buildGauge('chartSpo2', avgSpo2 !== null ? parseFloat(avgSpo2) : null, 100, '#06b6d4');
 }
@@ -257,4 +295,3 @@ document.getElementById('sendDailyEmailsBtn').addEventListener('click', async ()
     setUiLoggedOut();
   }
 })();
-
