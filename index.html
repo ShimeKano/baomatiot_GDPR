@@ -2,30 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>IoT GDPR Healthcare</title>
-  <link rel="stylesheet" href="/styles.css" />
-  <!-- Chart.js for data visualisation -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IoT Healthcare Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-
-  <!-- ── LOGIN PAGE ────────────────────────────────────────── -->
+  <!-- ── LOGIN PAGE ─────────────────────────────────────────── -->
   <section id="loginSection">
-    <div class="login-wrapper">
-      <div class="login-card">
-        <div class="login-header">
-          <div class="login-icon">&#x2764;&#xFE0F;</div>
+    <div class="auth-shell">
+      <div class="auth-card">
+        <div class="auth-left">
           <h1>IoT Healthcare</h1>
-          <p>GDPR-compliant sensor dashboard</p>
+          <p>Secure patient telemetry dashboard (JWT + role-based + MQTT ingestion).</p>
         </div>
-        <div class="login-body">
+        <div class="auth-right">
+          <h2>Sign In</h2>
           <form id="loginForm">
-            <div class="field-group">
-              <label for="email">Email address</label>
+            <div class="field">
+              <label for="email">Email</label>
               <input id="email" type="email" placeholder="you@example.com" required autocomplete="username" />
             </div>
-            <div class="field-group">
+            <div class="field">
               <label for="password">Password</label>
               <input id="password" type="password" placeholder="Min. 6 characters" minlength="6" required autocomplete="current-password" />
             </div>
@@ -71,7 +68,10 @@
             <code id="dtToken" class="dt-value dt-token">—</code>
             <button id="copyTokenBtn" class="btn-ghost btn-sm" title="Copy token">&#x1F4CB;</button>
           </div>
-          <p class="dt-hint">Include your device token in every MQTT message as <code>deviceToken</code>. Keep it secret — anyone with the token can write to your account.</p>
+          <p class="dt-hint">
+            Include your device token in every MQTT message as <code>deviceToken</code>.
+            Keep it secret — anyone with the token can write to your account.
+          </p>
           <button id="rotateTokenBtn" class="btn-secondary btn-sm">&#x21BB; Generate / Rotate Token</button>
         </div>
       </div>
@@ -87,64 +87,20 @@
         </div>
       </div>
 
-      <!-- KPI summary cards (populated by JS after load) -->
+      <!-- KPI summary cards (if app.js uses it) -->
       <div id="kpiCards" class="kpi-grid hidden"></div>
 
-      <!-- Charts section -->
-      <div id="chartsSection" class="hidden">
-        <div class="card chart-card">
-          <div class="chart-header">
-            <h3>Health Trends — Today</h3>
-            <button id="loadSummaryBtn" class="btn-secondary">&#x21BB; Refresh</button>
-          </div>
-          <div class="chart-grid">
-            <div class="chart-wrap">
-              <canvas id="chartTemp" aria-label="Temperature chart"></canvas>
-              <p class="chart-label">🌡 Temperature (°C)</p>
-            </div>
-            <div class="chart-wrap">
-              <canvas id="chartHR" aria-label="Heart rate chart"></canvas>
-              <p class="chart-label">💓 Heart Rate (bpm)</p>
-            </div>
-            <div class="chart-wrap">
-              <canvas id="chartSpo2" aria-label="SpO2 chart"></canvas>
-              <p class="chart-label">🩸 SpO2 (%)</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Keep chartsSection (may be referenced in JS) -->
+      <div id="chartsSection" class="hidden"></div>
 
-      <!-- Empty state shown when no data yet -->
-      <div id="emptyState" class="card empty-state hidden">
-        <div class="empty-icon">📡</div>
-        <h3>No sensor data for today</h3>
-        <p>Connect your IoT device and publish readings to see health trends here.</p>
-        <button id="loadSummaryBtnEmpty" class="btn-primary">Load Summary</button>
-      </div>
-
-      <!-- Initial prompt before first load -->
-      <div id="summaryPrompt" class="card empty-state">
-        <div class="empty-icon">📊</div>
-        <h3>Welcome to your health dashboard</h3>
-        <p>Click the button below to load today's health summary and charts.</p>
-        <button id="loadSummaryBtnPrompt" class="btn-primary">Load Daily Summary</button>
-      </div>
-
-      <!-- Admin section -->
-      <div id="adminControls" class="hidden">
-        <div class="card">
-          <h3 class="section-title">&#x1F6E1; Admin Actions</h3>
-          <div class="row">
-            <button id="listUsersBtn" class="btn-secondary">List Users</button>
-            <button id="sendDailyEmailsBtn" class="btn-secondary">Send Daily Emails</button>
-          </div>
-          <pre id="adminOutput"></pre>
-        </div>
-      </div>
+      <!-- DUMMY hidden elements to avoid null errors in old app.js -->
+      <button id="loadSummaryBtn" type="button" class="hidden" aria-hidden="true" tabindex="-1"></button>
+      <div id="summaryInfo" class="hidden" aria-hidden="true"></div>
+      <div id="summaryCards" class="hidden" aria-hidden="true"></div>
 
     </main>
   </section>
 
-  <script src="/app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
