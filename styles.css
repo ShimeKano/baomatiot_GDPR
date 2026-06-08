@@ -356,6 +356,46 @@ pre {
   border-radius: 6px;
 }
 
+.telemetry-visuals {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 20px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.telemetry-gauge-wrap {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+}
+
+.telemetry-gauge-wrap canvas {
+  max-height: 180px;
+  width: 100% !important;
+}
+
+.telemetry-gauge-value {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.telemetry-trend-wrap {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.telemetry-trend-wrap canvas {
+  height: 180px !important;
+  width: 100% !important;
+}
+
 /* ── RESPONSIVE ──────────────────────────────────────────── */
 @media (max-width: 600px) {
   .topbar { padding: 0 16px; }
@@ -363,5 +403,5 @@ pre {
   .dash-content { padding: 16px 12px 36px; }
   .chart-grid { grid-template-columns: 1fr; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .telemetry-visuals { grid-template-columns: 1fr; }
 }
-

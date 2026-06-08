@@ -82,6 +82,15 @@
           <h3>&#x1F4E1; Latest Telemetry Readings</h3>
           <button id="refreshTelemetryBtn" class="btn-secondary">&#x21BB; Refresh</button>
         </div>
+        <div id="telemetryVisuals" class="telemetry-visuals">
+          <div class="telemetry-gauge-wrap">
+            <canvas id="telemetryGauge" aria-label="Current sensor gauge"></canvas>
+            <p id="telemetryGaugeValue" class="telemetry-gauge-value">No data</p>
+          </div>
+          <div class="telemetry-trend-wrap">
+            <canvas id="telemetryTrend" aria-label="Telemetry trend chart"></canvas>
+          </div>
+        </div>
         <div id="telemetryTableWrap">
           <p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>
         </div>

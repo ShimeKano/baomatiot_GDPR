@@ -22,6 +22,11 @@ const summaryPrompt = document.getElementById('summaryPrompt');
 let chartTemp = null;
 let chartHR = null;
 let chartSpo2 = null;
+let telemetryGaugeChart = null;
+let telemetryTrendChart = null;
+let telemetryRefreshTimer = null;
+let telemetryLoading = false;
+const TELEMETRY_REFRESH_MS = 5000;
 
 function getToken() {
   return localStorage.getItem(tokenKey);
@@ -88,7 +93,7 @@ function setUiAuthenticated(user) {
   meInfo.textContent = `${user.email}  •  ${user.role}`;
   adminControls.classList.toggle('hidden', user.role !== 'admin');
   loadDeviceToken();
-  loadTelemetry();
+  startTelemetryAutoRefresh();
 }
 
 function setUiLoggedOut() {
@@ -108,6 +113,10 @@ function setUiLoggedOut() {
   if (dtToken) dtToken.textContent = '—';
   if (dtBroker) dtBroker.textContent = '—';
   if (dtTopic) dtTopic.textContent = '—';
+  stopTelemetryAutoRefresh();
+  destroyTelemetryVisualCharts();
+  const telemetryGaugeValue = document.getElementById('telemetryGaugeValue');
+  if (telemetryGaugeValue) telemetryGaugeValue.textContent = 'No data';
   const telemetryWrap = document.getElementById('telemetryTableWrap');
   if (telemetryWrap) telemetryWrap.innerHTML = '<p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>';
 }
@@ -146,6 +155,17 @@ function buildGauge(canvasId, value, max, color) {
       animation: { animateRotate: true, duration: 800 }
     }
   });
+}
+
+function destroyTelemetryVisualCharts() {
+  if (telemetryGaugeChart) {
+    telemetryGaugeChart.destroy();
+    telemetryGaugeChart = null;
+  }
+  if (telemetryTrendChart) {
+    telemetryTrendChart.destroy();
+    telemetryTrendChart = null;
+  }
 }
 
 /* Render KPI cards and charts from the summaries array */
@@ -288,12 +308,146 @@ function renderTelemetryTable(records) {
     </table>`;
 }
 
+function renderTelemetryVisuals(records) {
+  const gaugeValue = document.getElementById('telemetryGaugeValue');
+  const gaugeCanvas = document.getElementById('telemetryGauge');
+  const trendCanvas = document.getElementById('telemetryTrend');
+  if (!gaugeCanvas || !trendCanvas) return;
+  if (typeof Chart === 'undefined') {
+    destroyTelemetryVisualCharts();
+    if (gaugeValue) gaugeValue.textContent = 'Chart unavailable';
+    return;
+  }
+
+  if (!records || !records.length) {
+    destroyTelemetryVisualCharts();
+    if (gaugeValue) gaugeValue.textContent = 'No data';
+    return;
+  }
+
+  const latest = records[0];
+  const latestTemp = typeof latest.temperature === 'number' ? latest.temperature : null;
+  const latestHr = typeof latest.heartRate === 'number' ? latest.heartRate : null;
+  const latestSpo2 = typeof latest.spo2 === 'number' ? latest.spo2 : null;
+  const safeTemp = latestTemp !== null ? Math.min(Math.max(latestTemp, 0), 45) : 0;
+
+  if (gaugeValue) {
+    gaugeValue.textContent = latestTemp !== null
+      ? `${latestTemp.toFixed(1)} °C  •  ${latestHr ?? '—'} bpm  •  ${latestSpo2 ?? '—'}%`
+      : 'No temperature value';
+  }
+
+  if (telemetryGaugeChart) telemetryGaugeChart.destroy();
+  telemetryGaugeChart = new Chart(gaugeCanvas.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [safeTemp, 45 - safeTemp],
+        backgroundColor: ['#f59e0b', '#e0e7ff'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      rotation: 270,
+      circumference: 180,
+      cutout: '72%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      },
+      animation: { duration: 500 }
+    }
+  });
+
+  const ordered = [...records].reverse();
+  const labels = ordered.map((r) => new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+  if (telemetryTrendChart) telemetryTrendChart.destroy();
+  telemetryTrendChart = new Chart(trendCanvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Temp (°C)',
+          data: ordered.map((r) => (typeof r.temperature === 'number' ? r.temperature : null)),
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.2)',
+          tension: 0.35,
+          yAxisID: 'yTemp'
+        },
+        {
+          label: 'Heart Rate (bpm)',
+          data: ordered.map((r) => (typeof r.heartRate === 'number' ? r.heartRate : null)),
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.2)',
+          tension: 0.35,
+          yAxisID: 'yVital'
+        },
+        {
+          label: 'SpO2 (%)',
+          data: ordered.map((r) => (typeof r.spo2 === 'number' ? r.spo2 : null)),
+          borderColor: '#06b6d4',
+          backgroundColor: 'rgba(6, 182, 212, 0.2)',
+          tension: 0.35,
+          yAxisID: 'yVital'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 6 } },
+        yTemp: {
+          type: 'linear',
+          position: 'left',
+          suggestedMin: 34,
+          suggestedMax: 40,
+          title: { display: true, text: '°C' }
+        },
+        yVital: {
+          type: 'linear',
+          position: 'right',
+          suggestedMin: 50,
+          suggestedMax: 120,
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'bpm / %' }
+        }
+      }
+    }
+  });
+}
+
+function startTelemetryAutoRefresh() {
+  stopTelemetryAutoRefresh();
+  loadTelemetry();
+  telemetryRefreshTimer = setInterval(() => {
+    loadTelemetry();
+  }, TELEMETRY_REFRESH_MS);
+}
+
+function stopTelemetryAutoRefresh() {
+  if (telemetryRefreshTimer) {
+    clearInterval(telemetryRefreshTimer);
+    telemetryRefreshTimer = null;
+  }
+}
+
 async function loadTelemetry() {
+  if (telemetryLoading) return;
+  telemetryLoading = true;
   try {
     const result = await api('/api/telemetry?limit=20');
-    renderTelemetryTable(result.records);
+    const records = Array.isArray(result.records) ? result.records : [];
+    renderTelemetryVisuals(records);
+    renderTelemetryTable(records);
   } catch (error) {
     console.error('Failed to load telemetry', error);
+  } finally {
+    telemetryLoading = false;
   }
 }
 
@@ -314,6 +468,7 @@ document.getElementById('copyTokenBtn').addEventListener('click', () => {
 });
 
 document.getElementById('refreshTelemetryBtn').addEventListener('click', loadTelemetry);
+window.addEventListener('beforeunload', stopTelemetryAutoRefresh);
 
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
