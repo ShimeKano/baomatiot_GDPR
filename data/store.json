@@ -1,14 +1,5 @@
 {
-  "users": [
-    {
-      "id": "a3e7f832-7926-417a-a7b1-42d432343dc9",
-      "email": "22004249@st.vlute.edu.vn",
-      "passwordHash": "scrypt$41a933482218c138cb65a934c23e4ec0$33a322f31114c5a651ab76003dc4ac1de2c3b1ac7446def02ec28eb0469e70580ced3783a960ceea6b6b8c030ab725a7a1cd15c546f8600868986e3743d17d60",
-      "role": "admin",
-      "createdAt": "2026-06-08T12:50:40.068Z"
-    }
-  ],
+  "users": [],
   "sensorRecords": [],
-  "dailyEmailLogs": [],
-  "deviceTokens": []
+  "dailyEmailLogs": []
 }
