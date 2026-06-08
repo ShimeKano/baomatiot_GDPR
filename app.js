@@ -1,5 +1,6 @@
 const tokenKey = 'iot_gdpr_token';
 const apiBaseKey = 'iot_gdpr_api_base';
+const themeKey = 'iot_gdpr_theme';
 
 // Nếu bạn có App Service API, điền vào đây (ví dụ: https://iotgdpr-api.azurewebsites.net)
 // Để rỗng thì:
@@ -16,7 +17,7 @@ const adminOutput = document.getElementById('adminOutput');
 const kpiCards = document.getElementById('kpiCards');
 const chartsSection = document.getElementById('chartsSection');
 const emptyState = document.getElementById('emptyState');
-const summaryPrompt = document.getElementById('summaryPrompt');
+const themeToggleBtn = document.getElementById('themeToggle');
 
 // Chart instances (so we can destroy/re-create on refresh)
 let chartTemp = null;
@@ -38,6 +39,23 @@ function setToken(token) {
 
 function clearToken() {
   localStorage.removeItem(tokenKey);
+}
+
+function applyTheme(theme) {
+  const resolvedTheme = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', resolvedTheme);
+  if (themeToggleBtn) {
+    const isDark = resolvedTheme === 'dark';
+    themeToggleBtn.textContent = isDark ? '☀️' : '🌙';
+    themeToggleBtn.setAttribute('aria-pressed', String(isDark));
+    themeToggleBtn.setAttribute('title', isDark ? 'Switch to light theme' : 'Switch to dark theme');
+  }
+  localStorage.setItem(themeKey, resolvedTheme);
+}
+
+function initTheme() {
+  const savedTheme = localStorage.getItem(themeKey);
+  applyTheme(savedTheme === 'dark' ? 'dark' : 'light');
 }
 
 function getApiBase() {
@@ -103,7 +121,6 @@ function setUiLoggedOut() {
   kpiCards.classList.add('hidden');
   chartsSection.classList.add('hidden');
   emptyState.classList.add('hidden');
-  summaryPrompt.classList.remove('hidden');
   kpiCards.innerHTML = '';
   destroyCharts();
   // Reset device token UI
@@ -195,9 +212,6 @@ function renderSummaryUI(day, summaries) {
   const avgTemp = tempN ? (tempSum / tempN).toFixed(1) : null;
   const avgHR = hrN ? (hrSum / hrN).toFixed(0) : null;
   const avgSpo2 = spo2N ? (spo2Sum / spo2N).toFixed(1) : null;
-
-  // Hide prompt, show appropriate sections
-  summaryPrompt.classList.add('hidden');
 
   if (totalCount === 0) {
     emptyState.classList.remove('hidden');
@@ -469,6 +483,12 @@ document.getElementById('copyTokenBtn').addEventListener('click', () => {
 
 document.getElementById('refreshTelemetryBtn').addEventListener('click', loadTelemetry);
 window.addEventListener('beforeunload', stopTelemetryAutoRefresh);
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+  });
+}
 
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -508,7 +528,7 @@ async function loadSummary() {
 
 document.getElementById('loadSummaryBtn').addEventListener('click', loadSummary);
 document.getElementById('loadSummaryBtnEmpty').addEventListener('click', loadSummary);
-document.getElementById('loadSummaryBtnPrompt').addEventListener('click', loadSummary);
+document.getElementById('loadSummaryTopBtn').addEventListener('click', loadSummary);
 
 document.getElementById('listUsersBtn').addEventListener('click', async () => {
   try {
@@ -529,6 +549,7 @@ document.getElementById('sendDailyEmailsBtn').addEventListener('click', async ()
 });
 
 (async function bootstrap() {
+  initTheme();
   const token = getToken();
   if (!token) {
     setUiLoggedOut();
