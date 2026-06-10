@@ -18,6 +18,28 @@
   --shadow-lg: 0 8px 40px rgba(79,70,229,0.18);
   --radius: 16px;
   --radius-sm: 8px;
+  --topbar-bg: linear-gradient(90deg, var(--primary), #7c3aed, var(--accent));
+  --topbar-text: #ffffff;
+  --surface-hover: #eef2ff;
+}
+
+:root[data-theme='dark'] {
+  --primary: #818cf8;
+  --primary-dark: #6366f1;
+  --primary-light: #a5b4fc;
+  --accent: #22d3ee;
+  --bg: #0f172a;
+  --surface: #111827;
+  --surface2: #1f2937;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+  --border: #334155;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.35);
+  --shadow-md: 0 8px 28px rgba(0,0,0,0.35);
+  --shadow-lg: 0 14px 40px rgba(0,0,0,0.45);
+  --topbar-bg: linear-gradient(90deg, #312e81, #4c1d95, #0e7490);
+  --topbar-text: #f8fafc;
+  --surface-hover: #1e293b;
 }
 
 /* ── Reset / base ─────────────────────────────────────── */
@@ -29,6 +51,7 @@ body {
   color: var(--text);
   min-height: 100vh;
   line-height: 1.6;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 .hidden { display: none !important; }
 
@@ -155,6 +178,7 @@ body {
 }
 .btn-ghost:hover { background: rgba(255,255,255,0.25); }
 .btn-ghost:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.theme-toggle { min-width: 42px; justify-content: center; padding: 8px 10px; }
 
 .row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
 
@@ -163,14 +187,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(90deg, var(--primary), #7c3aed, var(--accent));
-  color: #fff;
+  background: var(--topbar-bg);
+  color: var(--topbar-text);
   padding: 0 28px;
   height: 62px;
   box-shadow: 0 2px 12px rgba(79,70,229,0.3);
   position: sticky;
   top: 0;
   z-index: 100;
+  backdrop-filter: blur(6px);
 }
 .topbar-brand { display: flex; align-items: center; gap: 10px; }
 .topbar-icon { font-size: 1.4rem; }
@@ -201,6 +226,11 @@ body {
   margin-bottom: 20px;
   box-shadow: var(--shadow-md);
   border: 1px solid var(--border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
 /* ── KPI GRID ────────────────────────────────────────────── */
@@ -222,7 +252,9 @@ body {
   gap: 6px;
   position: relative;
   overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
+.kpi-card:hover { transform: translateY(-2px); border-color: var(--primary-light); }
 .kpi-card::before {
   content: '';
   position: absolute;
@@ -264,6 +296,7 @@ body {
 .empty-state {
   text-align: center;
   padding: 48px 24px;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
 }
 .empty-icon { font-size: 3rem; margin-bottom: 12px; }
 .empty-state h3 { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 8px; }
@@ -298,17 +331,18 @@ pre {
 
 .dt-label {
   font-size: 0.85rem;
-  color: var(--muted);
+  color: var(--text-muted);
   min-width: 110px;
   font-weight: 600;
 }
 
 .dt-value {
   font-size: 0.85rem;
-  background: #f1f5f9;
+  background: var(--surface2);
   padding: 4px 8px;
   border-radius: 6px;
   word-break: break-all;
+  border: 1px solid var(--border);
 }
 
 .dt-token {
@@ -319,7 +353,7 @@ pre {
 
 .dt-hint {
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--text-muted);
   margin: 4px 0;
 }
 
@@ -342,13 +376,13 @@ pre {
 
 .telemetry-table th {
   font-weight: 600;
-  color: var(--muted);
-  background: #f8fafc;
+  color: var(--text-muted);
+  background: var(--surface2);
   position: sticky;
   top: 0;
 }
 
-.telemetry-table tbody tr:hover { background: #f1f5f9; }
+.telemetry-table tbody tr:hover { background: var(--surface-hover); }
 
 #telemetryTableWrap {
   max-height: 320px;
@@ -370,6 +404,7 @@ pre {
   border-radius: 12px;
   padding: 14px;
   text-align: center;
+  box-shadow: var(--shadow-sm);
 }
 
 .telemetry-gauge-wrap canvas {
@@ -389,6 +424,7 @@ pre {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px;
+  box-shadow: var(--shadow-sm);
 }
 
 .telemetry-trend-wrap canvas {
@@ -404,4 +440,12 @@ pre {
   .chart-grid { grid-template-columns: 1fr; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
   .telemetry-visuals { grid-template-columns: 1fr; }
+  .topbar-user .btn-ghost { padding: 8px 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

@@ -48,6 +48,8 @@
       </div>
       <div class="topbar-user">
         <span id="meInfo" class="user-chip"></span>
+        <button id="loadSummaryTopBtn" class="btn-ghost" type="button">Summary</button>
+        <button id="themeToggle" class="btn-ghost theme-toggle" type="button" aria-label="Toggle light and dark theme" aria-pressed="false">🌙</button>
         <button id="logoutBtn" class="btn-ghost">Logout</button>
       </div>
     </header>
@@ -129,14 +131,6 @@
         <h3>No sensor data for today</h3>
         <p>Connect your IoT device and publish readings to see health trends here.</p>
         <button id="loadSummaryBtnEmpty" class="btn-primary">Load Summary</button>
-      </div>
-
-      <!-- Initial prompt before first load -->
-      <div id="summaryPrompt" class="card empty-state">
-        <div class="empty-icon">📊</div>
-        <h3>Welcome to your health dashboard</h3>
-        <p>Click the button below to load today's health summary and charts.</p>
-        <button id="loadSummaryBtnPrompt" class="btn-primary">Load Daily Summary</button>
       </div>
 
       <!-- Admin section -->
