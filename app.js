@@ -18,6 +18,7 @@ const kpiCards = document.getElementById('kpiCards');
 const chartsSection = document.getElementById('chartsSection');
 const emptyState = document.getElementById('emptyState');
 const themeToggleBtn = document.getElementById('themeToggle');
+const loginThemeToggleBtn = document.getElementById('themeToggleLogin');
 
 // Chart instances (so we can destroy/re-create on refresh)
 let chartTemp = null;
@@ -27,6 +28,7 @@ let telemetryGaugeChart = null;
 let telemetryTrendChart = null;
 let telemetryRefreshTimer = null;
 let telemetryLoading = false;
+let latestTelemetryRecords = [];
 const TELEMETRY_REFRESH_MS = 5000;
 
 function getToken() {
@@ -44,18 +46,34 @@ function clearToken() {
 function applyTheme(theme) {
   const resolvedTheme = theme === 'dark' ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', resolvedTheme);
-  if (themeToggleBtn) {
-    const isDark = resolvedTheme === 'dark';
-    themeToggleBtn.textContent = isDark ? '☀️' : '🌙';
-    themeToggleBtn.setAttribute('aria-pressed', String(isDark));
-    themeToggleBtn.setAttribute('title', isDark ? 'Switch to light theme' : 'Switch to dark theme');
-  }
+  const isDark = resolvedTheme === 'dark';
+  [themeToggleBtn, loginThemeToggleBtn].forEach((toggleBtn) => {
+    if (!toggleBtn) return;
+    toggleBtn.textContent = isDark ? '☀️' : '🌙';
+    toggleBtn.setAttribute('aria-pressed', String(isDark));
+    toggleBtn.setAttribute('title', isDark ? 'Switch to light theme' : 'Switch to dark theme');
+  });
   localStorage.setItem(themeKey, resolvedTheme);
 }
 
 function initTheme() {
   const savedTheme = localStorage.getItem(themeKey);
-  applyTheme(savedTheme === 'dark' ? 'dark' : 'light');
+  if (savedTheme === 'dark' || savedTheme === 'light') {
+    applyTheme(savedTheme);
+    return;
+  }
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(prefersDark ? 'dark' : 'light');
+}
+
+function getThemePalette() {
+  const styles = getComputedStyle(document.documentElement);
+  return {
+    text: styles.getPropertyValue('--text').trim() || '#1e1b4b',
+    textMuted: styles.getPropertyValue('--text-muted').trim() || '#6b7280',
+    border: styles.getPropertyValue('--border').trim() || '#e0e7ff',
+    track: styles.getPropertyValue('--chart-track').trim() || '#e0e7ff'
+  };
 }
 
 function getApiBase() {
@@ -153,12 +171,13 @@ function buildGauge(canvasId, value, max, color) {
   const ctx = canvas.getContext('2d');
   const filled = value !== null ? Math.min(value, max) : 0;
   const remaining = max - filled;
+  const palette = getThemePalette();
   return new Chart(ctx, {
     type: 'doughnut',
     data: {
       datasets: [{
         data: [filled, remaining],
-        backgroundColor: [color, '#e0e7ff'],
+        backgroundColor: [color, palette.track],
         borderWidth: 0,
         borderRadius: 4
       }]
@@ -344,6 +363,7 @@ function renderTelemetryVisuals(records) {
   const latestHr = typeof latest.heartRate === 'number' ? latest.heartRate : null;
   const latestSpo2 = typeof latest.spo2 === 'number' ? latest.spo2 : null;
   const safeTemp = latestTemp !== null ? Math.min(Math.max(latestTemp, 0), 45) : 0;
+  const palette = getThemePalette();
 
   if (gaugeValue) {
     gaugeValue.textContent = latestTemp !== null
@@ -357,7 +377,7 @@ function renderTelemetryVisuals(records) {
     data: {
       datasets: [{
         data: [safeTemp, 45 - safeTemp],
-        backgroundColor: ['#f59e0b', '#e0e7ff'],
+        backgroundColor: ['#f59e0b', palette.track],
         borderWidth: 0
       }]
     },
@@ -412,23 +432,34 @@ function renderTelemetryVisuals(records) {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'bottom' } },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: palette.textMuted }
+        }
+      },
       scales: {
-        x: { ticks: { maxTicksLimit: 6 } },
+        x: {
+          ticks: { maxTicksLimit: 6, color: palette.textMuted },
+          grid: { color: palette.border }
+        },
         yTemp: {
           type: 'linear',
           position: 'left',
           suggestedMin: 34,
           suggestedMax: 40,
-          title: { display: true, text: '°C' }
+          title: { display: true, text: '°C', color: palette.textMuted },
+          ticks: { color: palette.textMuted },
+          grid: { color: palette.border }
         },
         yVital: {
           type: 'linear',
           position: 'right',
           suggestedMin: 50,
           suggestedMax: 120,
-          grid: { drawOnChartArea: false },
-          title: { display: true, text: 'bpm / %' }
+          grid: { drawOnChartArea: false, color: palette.border },
+          title: { display: true, text: 'bpm / %', color: palette.textMuted },
+          ticks: { color: palette.textMuted }
         }
       }
     }
@@ -456,6 +487,7 @@ async function loadTelemetry() {
   try {
     const result = await api('/api/telemetry?limit=20');
     const records = Array.isArray(result.records) ? result.records : [];
+    latestTelemetryRecords = records;
     renderTelemetryVisuals(records);
     renderTelemetryTable(records);
   } catch (error) {
@@ -483,11 +515,19 @@ document.getElementById('copyTokenBtn').addEventListener('click', () => {
 
 document.getElementById('refreshTelemetryBtn').addEventListener('click', loadTelemetry);
 window.addEventListener('beforeunload', stopTelemetryAutoRefresh);
-if (themeToggleBtn) {
-  themeToggleBtn.addEventListener('click', () => {
+function handleThemeToggle() {
     const currentTheme = document.documentElement.getAttribute('data-theme');
     applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
-  });
+    renderTelemetryVisuals(latestTelemetryRecords);
+    if (!chartsSection.classList.contains('hidden')) {
+      loadSummary().catch((error) => console.error('Failed to refresh summary on theme change', error));
+    }
+}
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener('click', handleThemeToggle);
+}
+if (loginThemeToggleBtn) {
+  loginThemeToggleBtn.addEventListener('click', handleThemeToggle);
 }
 
 loginForm.addEventListener('submit', async (event) => {
