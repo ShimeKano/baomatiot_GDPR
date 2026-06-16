@@ -1,755 +1,283 @@
-/* Full app.js with Wokwi sensors gauges + combined sensors chart integrated.
-   Copy/replace the repository's /app.js with this file.
-*/
+// app.js - vanilla JS dashboard (login, JWT, polling /api/telemetry, chart, device-token)
+// Place at repo root and referenced by index.html
 
-const tokenKey = 'iot_gdpr_token';
-const apiBaseKey = 'iot_gdpr_api_base';
-const themeKey = 'iot_gdpr_theme';
+// CONFIG
+const API_BASE = ''; // if backend on other host, set e.g. 'https://api.example.com'
+const TELEMETRY_URL = `${API_BASE}/api/telemetry?limit=40`;
+const AUTH_LOGIN = `${API_BASE}/api/auth/login`;
+const AUTH_ME = `${API_BASE}/api/auth/me`;
+const TOKEN_ENDPOINT = `${API_BASE}/api/telemetry/token`;
+const POLL_MS = 5000;
+const TOKEN_KEY = 'iot_gdpr_token';
 
-// Nếu bạn có App Service API, điền vào đây (ví dụ: https://iotgdpr-api.azurewebsites.net)
-// Để rỗng thì:
-// - local => dùng /api
-// - azurestaticapps => vẫn dùng /api (sẽ lỗi nếu không có SWA Functions)
-const DEFAULT_CLOUD_API_BASE = 'https://gdprapi-dwdehpbzaedrbdcj.eastasia-01.azurewebsites.net';
-
-const loginSection = document.getElementById('loginSection');
-const dashboardSection = document.getElementById('dashboardSection');
+// DOM refs
 const loginForm = document.getElementById('loginForm');
-const meInfo = document.getElementById('meInfo');
-const adminControls = document.getElementById('adminControls');
-const adminOutput = document.getElementById('adminOutput');
-const kpiCards = document.getElementById('kpiCards');
-const chartsSection = document.getElementById('chartsSection');
-const emptyState = document.getElementById('emptyState');
-const themeToggleBtn = document.getElementById('themeToggle');
-const loginThemeToggleBtn = document.getElementById('themeToggleLogin');
+const authArea = document.getElementById('authArea');
+const refreshBtn = document.getElementById('refreshBtn');
+const lastUpdated = document.getElementById('lastUpdated');
 
-// Chart instances (so we can destroy/re-create on refresh)
-let chartTemp = null;
-let chartHR = null;
-let chartSpo2 = null;
-let telemetryGaugeChart = null;
-let telemetryTrendChart = null;
-let telemetryRefreshTimer = null;
-let telemetryLoading = false;
-let latestTelemetryRecords = [];
-const TELEMETRY_REFRESH_MS = 5000;
+const vTemp = document.getElementById('v-temperature');
+const vHum = document.getElementById('v-humidity');
+const vMotion = document.getElementById('v-motion');
+const vDist = document.getElementById('v-distance');
+const vLight = document.getElementById('v-light');
 
-/* Small gauge instances and combined chart */
-let gaugeTempSmall = null;
-let gaugeHumiditySmall = null;
-let gaugeMotionSmall = null;
-let gaugeDistanceSmall = null;
-let gaugeLightSmall = null;
-let combinedSensorsChart = null;
+const sTemp = document.querySelector('#s-temperature .status-text');
+const sHum = document.querySelector('#s-humidity .status-text');
+const sMotion = document.querySelector('#s-motion .status-text');
+const sDist = document.querySelector('#s-distance .status-text');
+const sLight = document.querySelector('#s-light .status-text');
 
-function getToken() {
-  return localStorage.getItem(tokenKey);
+const dtBroker = document.getElementById('dtBroker');
+const dtTopic = document.getElementById('dtTopic');
+const dtToken = document.getElementById('dtToken');
+const copyTokenBtn = document.getElementById('copyToken');
+const rotateTokenBtn = document.getElementById('rotateToken');
+
+const tableBody = document.getElementById('tableBody');
+
+let combinedChart = null;
+let polling = null;
+let latestRecords = [];
+
+// AUTH helpers
+function getToken(){ return localStorage.getItem(TOKEN_KEY); }
+function setToken(t){ localStorage.setItem(TOKEN_KEY, t); }
+function clearToken(){ localStorage.removeItem(TOKEN_KEY); }
+
+// UTIL
+function formatTime(ts){
+  if(!ts) return '';
+  try { return new Date(ts).toLocaleString(); } catch(e){ return String(ts); }
 }
 
-function setToken(token) {
-  localStorage.setItem(tokenKey, token);
-}
-
-function clearToken() {
-  localStorage.removeItem(tokenKey);
-}
-
-function applyTheme(theme) {
-  const resolvedTheme = theme === 'dark' ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', resolvedTheme);
-  const isDark = resolvedTheme === 'dark';
-  [themeToggleBtn, loginThemeToggleBtn].forEach((toggleBtn) => {
-    if (!toggleBtn) return;
-    toggleBtn.textContent = isDark ? '☀️' : '🌙';
-    toggleBtn.setAttribute('aria-pressed', String(isDark));
-    toggleBtn.setAttribute('title', isDark ? 'Switch to light theme' : 'Switch to dark theme');
-  });
-  localStorage.setItem(themeKey, resolvedTheme);
-}
-
-function initTheme() {
-  const savedTheme = localStorage.getItem(themeKey);
-  if (savedTheme === 'dark' || savedTheme === 'light') {
-    applyTheme(savedTheme);
+// Show login or user (check /api/auth/me)
+async function initAuth(){
+  const t = getToken();
+  if(!t){
+    showLogin();
     return;
   }
-  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  applyTheme(prefersDark ? 'dark' : 'light');
-}
-
-function getThemePalette() {
-  const styles = getComputedStyle(document.documentElement);
-  return {
-    text: styles.getPropertyValue('--text').trim() || '#1e1b4b',
-    textMuted: styles.getPropertyValue('--text-muted').trim() || '#6b7280',
-    border: styles.getPropertyValue('--border').trim() || '#e0e7ff',
-    track: styles.getPropertyValue('--chart-track').trim() || '#e0e7ff'
-  };
-}
-
-function getApiBase() {
-  const fromStorage = (localStorage.getItem(apiBaseKey) || '').trim();
-  if (fromStorage) return fromStorage.replace(/\/+$/, '');
-
-  // Nếu chạy trên SWA domain mà có backend rời, bạn nên set DEFAULT_CLOUD_API_BASE
-  if (window.location.hostname.includes('azurestaticapps.net')) {
-    return DEFAULT_CLOUD_API_BASE.replace(/\/+$/, '');
+  try {
+    const res = await fetch(AUTH_ME, { headers: { 'Authorization': `Bearer ${t}` }});
+    if(!res.ok) { clearToken(); showLogin(); return; }
+    const json = await res.json();
+    showUser(json.user);
+  } catch(e){
+    console.warn('auth check failed', e);
+    clearToken();
+    showLogin();
   }
-
-  // local/dev mặc định dùng same-origin
-  return '';
 }
 
-function buildApiUrl(path) {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  const base = getApiBase();
-  return base ? `${base}${normalizedPath}` : normalizedPath;
+function showLogin(){
+  authArea.innerHTML = '';
+  authArea.appendChild(loginForm);
+  loginForm.style.display = 'flex';
 }
 
-async function api(path, options = {}) {
-  const token = getToken();
-  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const url = buildApiUrl(path);
-  const response = await fetch(url, { ...options, headers });
-
-  const raw = await response.text();
-  let data = null;
-
-  if (raw) {
-    try {
-      data = JSON.parse(raw);
-    } catch (error) {
-      console.error('Failed to parse API response JSON', error, { url, status: response.status, raw });
-      throw new Error(`API trả về dữ liệu không phải JSON (HTTP ${response.status})`);
-    }
-  }
-
-  if (!response.ok) {
-    const msg = (data && (data.error || data.message)) || `Request failed: ${response.status}`;
-    throw new Error(msg);
-  }
-
-  return data ?? {};
-}
-
-function setUiAuthenticated(user) {
-  loginSection.classList.add('hidden');
-  dashboardSection.classList.remove('hidden');
-  meInfo.textContent = `${user.email}  •  ${user.role}`;
-  adminControls.classList.toggle('hidden', user.role !== 'admin');
-  loadDeviceToken();
-  startTelemetryAutoRefresh();
-}
-
-function setUiLoggedOut() {
-  dashboardSection.classList.add('hidden');
-  loginSection.classList.remove('hidden');
-  // Reset dashboard state for next login
-  kpiCards.classList.add('hidden');
-  chartsSection.classList.add('hidden');
-  emptyState.classList.add('hidden');
-  kpiCards.innerHTML = '';
-  destroyCharts();
-  // Reset device token UI
-  const dtToken = document.getElementById('dtToken');
-  const dtBroker = document.getElementById('dtBroker');
-  const dtTopic = document.getElementById('dtTopic');
-  if (dtToken) dtToken.textContent = '—';
-  if (dtBroker) dtBroker.textContent = '—';
-  if (dtTopic) dtTopic.textContent = '—';
-  stopTelemetryAutoRefresh();
-  destroyTelemetryVisualCharts();
-  const telemetryGaugeValue = document.getElementById('telemetryGaugeValue');
-  if (telemetryGaugeValue) telemetryGaugeValue.textContent = 'No data';
-  const telemetryWrap = document.getElementById('telemetryTableWrap');
-  if (telemetryWrap) telemetryWrap.innerHTML = '<p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>';
-}
-
-// ── Chart helpers ───────────────────────────────────────────
-
-function destroyCharts() {
-  if (chartTemp)  { chartTemp.destroy();  chartTemp = null; }
-  if (chartHR)    { chartHR.destroy();    chartHR = null; }
-  if (chartSpo2)  { chartSpo2.destroy();  chartSpo2 = null; }
-}
-
-/* Build a gauge-style doughnut chart for a single average value */
-function buildGauge(canvasId, value, max, color) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return null;
-  const ctx = canvas.getContext('2d');
-  const filled = value !== null ? Math.min(value, max) : 0;
-  const remaining = max - filled;
-  const palette = getThemePalette();
-  return new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      datasets: [{
-        data: [filled, remaining],
-        backgroundColor: [color, palette.track],
-        borderWidth: 0,
-        borderRadius: 4
-      }]
-    },
-    options: {
-      cutout: '72%',
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: false }
-      },
-      animation: { animateRotate: true, duration: 800 }
-    }
-  });
-}
-
-function destroyTelemetryVisualCharts() {
-  if (telemetryGaugeChart) {
-    telemetryGaugeChart.destroy();
-    telemetryGaugeChart = null;
-  }
-  if (telemetryTrendChart) {
-    telemetryTrendChart.destroy();
-    telemetryTrendChart = null;
-  }
-  // destroy small/combined charts too
-  if (gaugeTempSmall) { try { gaugeTempSmall.destroy(); } catch(e){} gaugeTempSmall = null; }
-  if (gaugeHumiditySmall) { try { gaugeHumiditySmall.destroy(); } catch(e){} gaugeHumiditySmall = null; }
-  if (gaugeMotionSmall) { try { gaugeMotionSmall.destroy(); } catch(e){} gaugeMotionSmall = null; }
-  if (gaugeDistanceSmall) { try { gaugeDistanceSmall.destroy(); } catch(e){} gaugeDistanceSmall = null; }
-  if (gaugeLightSmall) { try { gaugeLightSmall.destroy(); } catch(e){} gaugeLightSmall = null; }
-  if (combinedSensorsChart) { try { combinedSensorsChart.destroy(); } catch(e){} combinedSensorsChart = null; }
-}
-
-/* Render KPI cards and charts from the summaries array */
-function renderSummaryUI(day, summaries) {
-  // Aggregate across all users visible to the requester
-  let totalCount = 0;
-  let tempSum = 0, tempN = 0;
-  let hrSum = 0, hrN = 0;
-  let spo2Sum = 0, spo2N = 0;
-
-  summaries.forEach(({ summary }) => {
-    totalCount += summary.count || 0;
-    if (summary.averages.temperature !== null) {
-      tempSum += summary.averages.temperature;
-      tempN++;
-    }
-    if (summary.averages.heartRate !== null) {
-      hrSum += summary.averages.heartRate;
-      hrN++;
-    }
-    if (summary.averages.spo2 !== null) {
-      spo2Sum += summary.averages.spo2;
-      spo2N++;
-    }
-  });
-
-  const avgTemp = tempN ? (tempSum / tempN).toFixed(1) : null;
-  const avgHR = hrN ? (hrSum / hrN).toFixed(0) : null;
-  const avgSpo2 = spo2N ? (spo2Sum / spo2N).toFixed(1) : null;
-
-  if (totalCount === 0) {
-    emptyState.classList.remove('hidden');
-    chartsSection.classList.add('hidden');
-    kpiCards.classList.add('hidden');
-    return;
-  }
-
-  emptyState.classList.add('hidden');
-
-  // Build KPI cards
-  kpiCards.innerHTML = `
-    <div class="kpi-card count">
-      <span class="kpi-icon">📋</span>
-      <span class="kpi-label">Records today</span>
-      <span class="kpi-value">${totalCount}</span>
-      <span class="kpi-unit">${day}</span>
-    </div>
-    <div class="kpi-card temp">
-      <span class="kpi-icon">🌡</span>
-      <span class="kpi-label">Avg Temperature</span>
-      ${avgTemp !== null
-        ? `<span class="kpi-value">${avgTemp}<small style="font-size:1rem"> °C</small></span>`
-        : `<span class="kpi-null">—</span>`}
-    </div>
-    <div class="kpi-card hr">
-      <span class="kpi-icon">💓</span>
-      <span class="kpi-label">Avg Heart Rate</span>
-      ${avgHR !== null
-        ? `<span class="kpi-value">${avgHR}<small style="font-size:1rem"> bpm</small></span>`
-        : `<span class="kpi-null">—</span>`}
-    </div>
-    <div class="kpi-card spo2">
-      <span class="kpi-icon">🩸</span>
-      <span class="kpi-label">Avg SpO2</span>
-      ${avgSpo2 !== null
-        ? `<span class="kpi-value">${avgSpo2}<small style="font-size:1rem"> %</small></span>`
-        : `<span class="kpi-null">—</span>`}
+function showUser(user){
+  loginForm.style.display = 'none';
+  authArea.innerHTML = `
+    <div class="user-info">
+      <span style="margin-right:12px">${user?.email || user?.name || 'user'}</span>
+      <button id="logoutBtnLocal" class="btn">Logout</button>
     </div>
   `;
-  kpiCards.classList.remove('hidden');
-
-  // Build gauge charts
-  chartsSection.classList.remove('hidden');
-  destroyCharts();
-  // Temp gauge: 0–45 °C range
-  chartTemp = buildGauge('chartTemp', avgTemp !== null ? parseFloat(avgTemp) : null, 45, '#f59e0b');
-  // Heart rate gauge: 0–200 bpm range
-  chartHR = buildGauge('chartHR', avgHR !== null ? parseFloat(avgHR) : null, 200, '#ef4444');
-  // SpO2 gauge: 0–100 % range
-  chartSpo2 = buildGauge('chartSpo2', avgSpo2 !== null ? parseFloat(avgSpo2) : null, 100, '#06b6d4');
-}
-
-// ── Device Token & Telemetry ─────────────────────────────────
-
-async function loadDeviceToken() {
-  try {
-    const result = await api('/api/telemetry/token');
-    const dtToken = document.getElementById('dtToken');
-    const dtBroker = document.getElementById('dtBroker');
-    const dtTopic = document.getElementById('dtTopic');
-    if (dtBroker) dtBroker.textContent = result.mqttBroker || '—';
-    if (dtTopic) dtTopic.textContent = result.mqttTopic || '—';
-    if (dtToken) dtToken.textContent = result.deviceToken || '(none — click Generate)';
-  } catch (error) {
-    console.error('Failed to load device token', error);
-  }
-}
-
-async function rotateDeviceToken() {
-  try {
-    const result = await api('/api/telemetry/token', { method: 'POST' });
-    const dtToken = document.getElementById('dtToken');
-    const dtBroker = document.getElementById('dtBroker');
-    const dtTopic = document.getElementById('dtTopic');
-    if (dtBroker) dtBroker.textContent = result.mqttBroker || '—';
-    if (dtTopic) dtTopic.textContent = result.mqttTopic || '—';
-    if (dtToken) dtToken.textContent = result.deviceToken;
-  } catch (error) {
-    alert(error.message);
-  }
-}
-
-function renderTelemetryTable(records) {
-  const wrap = document.getElementById('telemetryTableWrap');
-  if (!wrap) return;
-  if (!records || !records.length) {
-    wrap.innerHTML = '<p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>';
-    return;
-  }
-
-  // Build union of all keys across records excluding internal fields
-  const exclude = new Set(['deviceToken', 'deviceId', 'timestamp']);
-  const keys = new Set();
-  records.forEach((r) => {
-    Object.keys(r).forEach((k) => {
-      if (!exclude.has(k)) keys.add(k);
-    });
+  document.getElementById('logoutBtnLocal').addEventListener('click', () => {
+    clearToken();
+    initAuth();
   });
-  const sensorKeys = Array.from(keys).sort();
-
-  // Build header row: Time, Device, <sensor keys...>
-  const headerCells = ['<th>Time</th>', '<th>Device</th>']
-    .concat(sensorKeys.map(k => `<th>${k}</th>`))
-    .join('');
-
-  // Build body rows
-  const rows = records.map((r) => {
-    const cells = [];
-    cells.push(`<td>${new Date(r.timestamp).toLocaleString()}</td>`);
-    cells.push(`<td>${r.deviceId || '—'}</td>`);
-    sensorKeys.forEach(k => {
-      const v = r[k];
-      const display = (v === null || v === undefined) ? '—' : (typeof v === 'number' ? v : String(v));
-      // Add unit hints for known sensors
-      let withUnit = display;
-      const lk = k.toLowerCase();
-      if (lk.includes('temp')) withUnit = `${display} °C`;
-      else if (lk.includes('humidity')) withUnit = `${display} %`;
-      else if (lk.includes('hr') || lk.includes('heartrate')) withUnit = `${display} bpm`;
-      else if (lk.includes('spo2')) withUnit = `${display} %`;
-      else if (lk.includes('distance')) withUnit = `${display} cm`;
-      else if (lk.includes('light')) withUnit = `${display}`;
-      cells.push(`<td>${withUnit}</td>`);
-    });
-    return `<tr>${cells.join('')}</tr>`;
-  }).join('');
-
-  wrap.innerHTML = `
-    <table class="telemetry-table">
-      <thead>
-        <tr>${headerCells}</tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>`;
 }
 
-function renderTelemetryVisuals(records) {
-  const gaugeValue = document.getElementById('telemetryGaugeValue');
-  const gaugeCanvas = document.getElementById('telemetryGauge');
-  const trendCanvas = document.getElementById('telemetryTrend');
-  if (!gaugeCanvas || !trendCanvas) return;
-  if (typeof Chart === 'undefined') {
-    destroyTelemetryVisualCharts();
-    if (gaugeValue) gaugeValue.textContent = 'Chart unavailable';
-    return;
-  }
-  if (!records || !records.length) {
-    destroyTelemetryVisualCharts();
-    if (gaugeValue) gaugeValue.textContent = 'No data';
-    return;
-  }
+// LOGIN
+loginForm.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if(!email || !password) return alert('Fill email and password');
 
-  const latest = records[0];
-
-  // Determine sensor keys automatically (union across latest record)
-  const exclude = new Set(['deviceToken', 'deviceId', 'timestamp']);
-  const keys = new Set();
-  records.forEach(r => Object.keys(r).forEach(k => { if (!exclude.has(k)) keys.add(k); }));
-  const sensorKeys = Array.from(keys).sort();
-
-  // Choose colors for known sensors, fallback palette for others
-  const colorMap = {
-    temperature: '#f59e0b',
-    temp: '#f59e0b',
-    humidity: '#0ea5a3',
-    heartRate: '#ef4444',
-    hr: '#ef4444',
-    spo2: '#06b6d4',
-    respRate: '#8b5cf6',
-    bpsys: '#f97316',
-    bpdia: '#fb7185'
-  };
-  const fallbackColors = ['#6366f1','#10b981','#06b6d4','#f59e0b','#ef4444','#a78bfa','#34d399'];
-  let fallbackIndex = 0;
-
-  // Update gauge text to show latest sensors inline
-  if (gaugeValue) {
-    const parts = sensorKeys.map(k => {
-      const v = latest[k];
-      const s = (v === null || v === undefined) ? '—' : (typeof v === 'number' ? v : String(v));
-      return `${k}: ${s}`;
+  try {
+    const res = await fetch(AUTH_LOGIN, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ email, password })
     });
-    gaugeValue.textContent = parts.join('  •  ');
+    if(!res.ok){
+      const txt = await res.text();
+      throw new Error(txt || `Login failed (${res.status})`);
+    }
+    const json = await res.json();
+    if(json.token) setToken(json.token);
+    await initAuth();
+    await loadDeviceToken();
+    await loadTelemetry();
+  } catch(err){
+    alert('Login error: ' + (err.message || err));
+    console.error(err);
   }
+});
 
-  // Build trend chart datasets
+// API wrapper (adds Authorization if token)
+async function apiFetch(path, opts = {}) {
+  const headers = (opts.headers ? {...opts.headers} : {});
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(path, { ...opts, headers });
+  return res;
+}
+
+// LOAD telemetry
+async function loadTelemetry(){
+  try {
+    const res = await apiFetch(TELEMETRY_URL);
+    if(res.status === 401){
+      // need login
+      latestRecords = [];
+      renderNoData();
+      return;
+    }
+    const json = await res.json();
+    const recs = Array.isArray(json.records) ? json.records : (Array.isArray(json) ? json : []);
+    latestRecords = recs;
+    renderTelemetry(recs);
+  } catch(e){
+    console.error('loadTelemetry', e);
+  }
+}
+
+// RENDER metrics, chart, table
+function renderTelemetry(records){
+  const latest = (records && records.length) ? records[0] : null;
+
+  vTemp.textContent = latest && typeof latest.temperature === 'number' ? latest.temperature.toFixed(1) + '°C' : '--';
+  vHum.textContent = latest && typeof latest.humidity === 'number' ? Math.round(latest.humidity) + '%' : '--';
+  vMotion.textContent = latest ? (latest.motion ? 'Detected' : 'No') : '--';
+  vDist.textContent = latest && typeof latest.distance === 'number' ? latest.distance.toFixed(1) + ' cm' : '--';
+  vLight.textContent = latest && typeof latest.light === 'number' ? latest.light + ' lx' : '--';
+
+  sTemp.textContent = (latest && typeof latest.temperature === 'number') ? (latest.temperature > 60 ? 'Critical' : (latest.temperature > 45 ? 'High' : 'Normal')) : '—';
+  sHum.textContent = (latest && typeof latest.humidity === 'number') ? 'Normal' : '—';
+  sMotion.textContent = latest ? (latest.motion ? 'Detected' : 'No motion') : '—';
+  sDist.textContent = (latest && typeof latest.distance === 'number') ? 'OK' : '—';
+  sLight.textContent = (latest && typeof latest.light === 'number') ? 'OK' : '—';
+
+  lastUpdated.textContent = records.length ? `Updated ${new Date().toLocaleTimeString()}` : 'No data';
+
+  renderCombinedChart(records);
+  renderTable(records);
+}
+
+function renderNoData(){
+  vTemp.textContent = vHum.textContent = vMotion.textContent = vDist.textContent = vLight.textContent = '--';
+  lastUpdated.textContent = 'No data';
+  tableBody.innerHTML = `<tr><td colspan="7" class="muted">No telemetry yet.</td></tr>`;
+  if(combinedChart){ combinedChart.data.labels = []; combinedChart.data.datasets.forEach(ds => ds.data = []); combinedChart.update(); }
+}
+
+// Chart.js rendering
+function renderCombinedChart(records){
+  const ctx = document.getElementById('combinedChart').getContext('2d');
   const ordered = [...records].reverse();
-  const labels = ordered.map((r) => new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+  const labels = ordered.map(r => r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : (r.timestampMillis ? new Date(r.timestampMillis).toLocaleTimeString() : ''));
 
-  const datasets = sensorKeys.map((k) => {
-    const keyLower = k.toLowerCase();
-    const mapped = colorMap[k] || colorMap[keyLower] || (fallbackColors[fallbackIndex++ % fallbackColors.length]);
-    return {
-      label: `${k}`,
-      data: ordered.map(r => (r[k] !== undefined ? (typeof r[k] === 'number' ? r[k] : null) : null)),
-      borderColor: mapped,
-      backgroundColor: mapped,
-      tension: 0.35,
-      spanGaps: true
-    };
-  });
+  const tempData = ordered.map(r => (typeof r.temperature === 'number' ? r.temperature : null));
+  const humData = ordered.map(r => (typeof r.humidity === 'number' ? r.humidity : null));
+  const distData = ordered.map(r => (typeof r.distance === 'number' ? r.distance : null));
+  const lightData = ordered.map(r => (typeof r.light === 'number' ? r.light : null));
 
-  // Make backgroundColor semi-transparent based on borderColor
-  datasets.forEach(ds => {
-    try {
-      const hex = ds.borderColor.replace('#','');
-      const bigint = parseInt(hex, 16);
-      const r = (bigint >> 16) & 255;
-      const g = (bigint >> 8) & 255;
-      const b = bigint & 255;
-      ds.backgroundColor = `rgba(${r}, ${g}, ${b}, 0.18)`;
-    } catch (e) {
-      ds.backgroundColor = 'rgba(99,102,241,0.12)';
-    }
-  });
+  const datasets = [
+    { label: 'Temperature', data: tempData, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.08)', tension:0.3, spanGaps:true },
+    { label: 'Humidity', data: humData, borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,0.06)', tension:0.3, spanGaps:true },
+    { label: 'Distance', data: distData, borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.06)', tension:0.3, spanGaps:true },
+    { label: 'Light', data: lightData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.06)', tension:0.3, spanGaps:true }
+  ];
 
-  // Destroy previous charts and create new
-  if (telemetryGaugeChart) telemetryGaugeChart.destroy();
-  telemetryGaugeChart = new Chart(gaugeCanvas.getContext('2d'), {
-    type: 'doughnut',
-    data: {
-      datasets: [{
-        data: [1, 0], // minimal visual — gauge shows latest values textually now
-        backgroundColor: ['#f59e0b', getThemePalette().track],
-        borderWidth: 0
-      }]
-    },
-    options: {
-      rotation: 270,
-      circumference: 180,
-      cutout: '72%',
-      plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      animation: { duration: 250 }
-    }
-  });
+  if(combinedChart){ combinedChart.destroy(); combinedChart = null; }
 
-  if (telemetryTrendChart) telemetryTrendChart.destroy();
-  telemetryTrendChart = new Chart(trendCanvas.getContext('2d'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'bottom', labels: { color: getThemePalette().textMuted } } },
-      scales: {
-        x: { ticks: { maxTicksLimit: 6, color: getThemePalette().textMuted }, grid: { color: getThemePalette().border } },
-        y: { ticks: { color: getThemePalette().textMuted }, grid: { color: getThemePalette().border } }
-      }
-    }
-  });
-
-  // update new small gauges & combined chart
-  try {
-    renderSmallGauges(records);
-    renderCombinedSensorsChart(records);
-  } catch (e) {
-    console.warn('Small gauges/chart update failed', e);
-  }
-}
-
-// ── Device Token & Telemetry helpers continued (existing code) ──
-
-function startTelemetryAutoRefresh() {
-  stopTelemetryAutoRefresh();
-  loadTelemetry();
-  telemetryRefreshTimer = setInterval(() => {
-    loadTelemetry();
-  }, TELEMETRY_REFRESH_MS);
-}
-
-function stopTelemetryAutoRefresh() {
-  if (telemetryRefreshTimer) {
-    clearInterval(telemetryRefreshTimer);
-    telemetryRefreshTimer = null;
-  }
-}
-
-async function loadTelemetry() {
-  if (telemetryLoading) return;
-  telemetryLoading = true;
-  try {
-    const result = await api('/api/telemetry?limit=20');
-    const records = Array.isArray(result.records) ? result.records : [];
-    latestTelemetryRecords = records;
-    renderTelemetryVisuals(records);
-    renderTelemetryTable(records);
-  } catch (error) {
-    console.error('Failed to load telemetry', error);
-  } finally {
-    telemetryLoading = false;
-  }
-}
-
-// --- START: Small gauges & combined sensors chart helpers ---
-
-function safeNumber(val) {
-  if (val === null || val === undefined) return null;
-  const n = Number(val);
-  return Number.isFinite(n) ? n : null;
-}
-
-function destroySmallGauges() {
-  if (gaugeTempSmall) { try { gaugeTempSmall.destroy(); } catch(e){} gaugeTempSmall = null; }
-  if (gaugeHumiditySmall) { try { gaugeHumiditySmall.destroy(); } catch(e){} gaugeHumiditySmall = null; }
-  if (gaugeMotionSmall) { try { gaugeMotionSmall.destroy(); } catch(e){} gaugeMotionSmall = null; }
-  if (gaugeDistanceSmall) { try { gaugeDistanceSmall.destroy(); } catch(e){} gaugeDistanceSmall = null; }
-  if (gaugeLightSmall) { try { gaugeLightSmall.destroy(); } catch(e){} gaugeLightSmall = null; }
-}
-
-function renderSmallGauges(records) {
-  if (!records || !records.length) {
-    destroySmallGauges();
-    return;
-  }
-  const latest = records[0];
-
-  const temp = safeNumber(latest.temperature);
-  const humidity = safeNumber(latest.humidity);
-  const motion = (latest.motion !== undefined) ? (latest.motion ? 1 : 0) : null;
-  const distance = safeNumber(latest.distance);
-  const light = safeNumber(latest.light);
-
-  // destroy previous
-  destroySmallGauges();
-
-  // create gauges when present (use existing buildGauge)
-  try {
-    if (document.getElementById('gaugeTempSmall')) gaugeTempSmall = buildGauge('gaugeTempSmall', temp, 45, '#f59e0b');
-    if (document.getElementById('gaugeHumiditySmall')) gaugeHumiditySmall = buildGauge('gaugeHumiditySmall', humidity, 100, '#0ea5a3');
-    if (motion !== null && document.getElementById('gaugeMotionSmall')) gaugeMotionSmall = buildGauge('gaugeMotionSmall', motion, 1, motion === 1 ? '#10b981' : '#94a3b8');
-    if (document.getElementById('gaugeDistanceSmall')) gaugeDistanceSmall = buildGauge('gaugeDistanceSmall', distance, 500, '#8b5cf6');
-    if (document.getElementById('gaugeLightSmall')) gaugeLightSmall = buildGauge('gaugeLightSmall', light, 4095, '#f97316');
-  } catch (e) {
-    console.warn('Failed to create small gauges', e);
-  }
-}
-
-function renderCombinedSensorsChart(records) {
-  const canvas = document.getElementById('combinedSensorsChart');
-  if (!canvas || typeof Chart === 'undefined') return;
-
-  if (combinedSensorsChart) {
-    try { combinedSensorsChart.destroy(); } catch(e) {}
-    combinedSensorsChart = null;
-  }
-  if (!records || !records.length) return;
-
-  const exclude = new Set(['deviceToken','deviceId','timestamp']);
-  const keys = new Set();
-  records.forEach(r => Object.keys(r).forEach(k => { if (!exclude.has(k) && typeof r[k] === 'number') keys.add(k); }));
-  const sensorKeys = Array.from(keys).sort();
-  const ordered = [...records].reverse();
-  const labels = ordered.map(r => {
-    const d = r.timestamp ? new Date(r.timestamp) : new Date();
-    return d.toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', second:'2-digit' });
-  });
-
-  const palette = ['#f59e0b','#0ea5a3','#ef4444','#06b6d4','#8b5cf6','#a78bfa','#34d399'];
-  let idx = 0;
-  const datasets = sensorKeys.map(k => {
-    const ds = {
-      label: k,
-      data: ordered.map(r => (typeof r[k] === 'number' ? r[k] : null)),
-      borderColor: palette[idx % palette.length],
-      backgroundColor: palette[idx % palette.length],
-      tension: 0.3,
-      spanGaps: true
-    };
-    idx++;
-    return ds;
-  });
-
-  combinedSensorsChart = new Chart(canvas.getContext('2d'), {
+  combinedChart = new Chart(ctx, {
     type: 'line',
     data: { labels, datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { position: 'bottom' } },
-      scales: {
-        x: { ticks: { maxTicksLimit: 6 } },
-        y: { beginAtZero: false }
-      }
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ color:'#cbd5e1' } }, tooltip:{ mode:'index', intersect:false } },
+      scales:{ x:{ ticks:{ color:'#9ca3af' }, grid:{ color:'rgba(255,255,255,0.02)' } }, y:{ ticks:{ color:'#9ca3af' }, grid:{ color:'rgba(255,255,255,0.02)' } } }
     }
   });
 }
 
-// --- END: Small gauges & combined sensors chart helpers ---
-
-// ── Event listeners and bootstrap (unchanged) ──
-
-document.getElementById('rotateTokenBtn').addEventListener('click', rotateDeviceToken);
-
-document.getElementById('copyTokenBtn').addEventListener('click', () => {
-  const tokenEl = document.getElementById('dtToken');
-  const text = tokenEl ? tokenEl.textContent : '';
-  if (text && text !== '—' && text !== '(none — click Generate)') {
-    navigator.clipboard.writeText(text).then(() => {
-      const btn = document.getElementById('copyTokenBtn');
-      btn.textContent = '✅';
-      setTimeout(() => { btn.textContent = '📋'; }, 1500);
-    });
-  }
-});
-
-document.getElementById('refreshTelemetryBtn').addEventListener('click', loadTelemetry);
-window.addEventListener('beforeunload', stopTelemetryAutoRefresh);
-function handleThemeToggle() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
-    renderTelemetryVisuals(latestTelemetryRecords);
-    if (!chartsSection.classList.contains('hidden')) {
-      loadSummary().catch((error) => console.error('Failed to refresh summary on theme change', error));
-    }
-}
-if (themeToggleBtn) {
-  themeToggleBtn.addEventListener('click', handleThemeToggle);
-}
-if (loginThemeToggleBtn) {
-  loginThemeToggleBtn.addEventListener('click', handleThemeToggle);
-}
-
-loginForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  const loginBtn = document.getElementById('loginBtn');
-
-  loginBtn.disabled = true;
-  loginBtn.textContent = 'Signing in…';
-  try {
-    const result = await api('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-    setToken(result.token);
-    setUiAuthenticated(result.user);
-  } catch (error) {
-    alert(error.message);
-    loginBtn.disabled = false;
-    loginBtn.textContent = 'Sign In';
-  }
-});
-
-document.getElementById('logoutBtn').addEventListener('click', () => {
-  clearToken();
-  setUiLoggedOut();
-});
-
-async function loadSummary() {
-  try {
-    const result = await api('/api/sensors/daily-summary');
-    renderSummaryUI(result.day, result.summaries);
-  } catch (error) {
-    alert(error.message);
-  }
-}
-
-document.getElementById('loadSummaryBtn').addEventListener('click', loadSummary);
-document.getElementById('loadSummaryBtnEmpty').addEventListener('click', loadSummary);
-document.getElementById('loadSummaryTopBtn').addEventListener('click', loadSummary);
-
-document.getElementById('listUsersBtn').addEventListener('click', async () => {
-  try {
-    const result = await api('/api/users');
-    adminOutput.textContent = JSON.stringify(result, null, 2);
-  } catch (error) {
-    alert(error.message);
-  }
-});
-
-document.getElementById('sendDailyEmailsBtn').addEventListener('click', async () => {
-  try {
-    const result = await api('/api/admin/send-daily-emails', { method: 'POST' });
-    adminOutput.textContent = JSON.stringify(result, null, 2);
-  } catch (error) {
-    alert(error.message);
-  }
-});
-
-(async function bootstrap() {
-  initTheme();
-  const token = getToken();
-  if (!token) {
-    setUiLoggedOut();
+// table render
+function renderTable(records){
+  if(!records || records.length === 0){
+    tableBody.innerHTML = `<tr><td colspan="7" class="muted">No telemetry yet.</td></tr>`;
     return;
   }
+  const rows = records.map(r => {
+    const t = r.timestamp ? formatTime(r.timestamp) : (r.timestampMillis ? formatTime(r.timestampMillis) : '—');
+    const dev = r.deviceId || '—';
+    const temp = typeof r.temperature === 'number' ? `${r.temperature} °C` : '—';
+    const hum = typeof r.humidity === 'number' ? `${r.humidity} %` : '—';
+    const motion = (r.motion === 1 || r.motion === true) ? 'Detected' : 'No';
+    const dist = typeof r.distance === 'number' ? `${r.distance} cm` : '—';
+    const light = typeof r.light === 'number' ? `${r.light}` : '—';
+    return `<tr><td>${t}</td><td>${dev}</td><td>${temp}</td><td>${hum}</td><td>${motion}</td><td>${dist}</td><td>${light}</td></tr>`;
+  }).join('');
+  tableBody.innerHTML = rows;
+}
 
+// Device token management
+async function loadDeviceToken(){
   try {
-    const result = await api('/api/auth/me');
-    setToken(result.token); // ensure token is consistent
-    setUiAuthenticated(result.user);
-  } catch (_error) {
-    clearToken();
-    setUiLoggedOut();
+    const res = await apiFetch(TOKEN_ENDPOINT);
+    if(!res.ok){ dtBroker.textContent='—'; dtTopic.textContent='—'; dtToken.value = '—'; return; }
+    const json = await res.json();
+    dtBroker.textContent = json.mqttBroker || '—';
+    dtTopic.textContent = json.mqttTopic || '—';
+    dtToken.value = json.deviceToken || '—';
+  } catch(e){
+    console.warn('loadDeviceToken', e);
   }
+}
+
+copyTokenBtn && copyTokenBtn.addEventListener('click', () => {
+  const t = dtToken.value || '';
+  if(t && t !== '—') navigator.clipboard.writeText(t).then(()=> alert('Token copied'));
+});
+
+rotateTokenBtn && rotateTokenBtn.addEventListener('click', async () => {
+  try {
+    const res = await apiFetch(TOKEN_ENDPOINT, { method:'POST' });
+    if(!res.ok) throw new Error('Rotate failed');
+    const json = await res.json();
+    dtToken.value = json.deviceToken || '—';
+  } catch(e){
+    alert('Rotate failed: ' + (e.message || e));
+  }
+});
+
+// API wrapper used above
+async function apiFetch(path, opts = {}) {
+  const headers = (opts.headers ? {...opts.headers} : {});
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(path, { ...opts, headers });
+  return res;
+}
+
+// UI actions
+refreshBtn.addEventListener('click', () => loadTelemetry());
+
+// Polling
+function startPolling(){
+  if(polling) clearInterval(polling);
+  loadTelemetry();
+  polling = setInterval(loadTelemetry, POLL_MS);
+}
+
+// INIT
+(async function boot(){
+  initAuth();
+  await loadDeviceToken();
+  startPolling();
 })();
