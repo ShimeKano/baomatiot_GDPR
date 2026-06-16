@@ -1,189 +1,117 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>IOT cloud</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <title>IoT Monitoring Dashboard</title>
+
   <link rel="stylesheet" href="/styles.css" />
-  <!-- Chart.js for data visualisation -->
+
+  <!-- Chart.js (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
-
-  <!-- ── LOGIN PAGE ────────────────────────────────────────── -->
-  <section id="loginSection">
-    <div class="login-wrapper">
-      <div class="login-card">
-        <div class="login-toolbar">
-          <button id="themeToggleLogin" class="btn-ghost theme-toggle" type="button" aria-label="Toggle light and dark theme" aria-pressed="false">🌙</button>
-        </div>
-        <div class="login-header">
-          <div class="login-icon">&#x2764;&#xFE0F;</div>
-          <h1>IOT cloud</h1>
-          <p>GDPR-compliant sensor dashboard</p>
-        </div>
-        <div class="login-body">
-          <form id="loginForm">
-            <div class="field-group">
-              <label for="email">Email address</label>
-              <input id="email" type="email" placeholder="you@example.com" required autocomplete="username" />
-            </div>
-            <div class="field-group">
-              <label for="password">Password</label>
-              <input id="password" type="password" placeholder="Min. 6 characters" minlength="6" required autocomplete="current-password" />
-            </div>
-            <button type="submit" class="btn-primary btn-full" id="loginBtn">Sign In</button>
-          </form>
-          <p class="hint">Default admin: <strong>22004249@st.vlute.edu.vn</strong></p>
-        </div>
+  <div class="app container">
+    <header class="header">
+      <div>
+        <h1 class="title">IoT Monitoring Dashboard</h1>
+        <p class="subtitle">Live telemetry — same API logic as before</p>
       </div>
-    </div>
-  </section>
 
-  <!-- ── DASHBOARD PAGE ─────────────────────────────────────── -->
-  <section id="dashboardSection" class="hidden">
-
-    <!-- Top navigation bar -->
-    <header class="topbar">
-      <div class="topbar-brand">
-        <span class="topbar-icon">&#x2764;&#xFE0F;</span>
-        <span class="topbar-title">IOT cloud</span>
-      </div>
-      <div class="topbar-user">
-        <span id="meInfo" class="user-chip"></span>
-        <button id="loadSummaryTopBtn" class="btn-ghost" type="button">Summary</button>
-        <button id="themeToggle" class="btn-ghost theme-toggle" type="button" aria-label="Toggle light and dark theme" aria-pressed="false">🌙</button>
-        <button id="logoutBtn" class="btn-ghost">Logout</button>
+      <div id="authArea" class="auth-area">
+        <!-- Login form will be injected if not authenticated -->
+        <form id="loginForm" class="login-form" novalidate>
+          <input id="email" type="email" placeholder="email" required />
+          <input id="password" type="password" placeholder="password" required />
+          <button id="loginBtn" type="submit" class="btn primary">Sign in</button>
+        </form>
       </div>
     </header>
 
-    <main class="dash-content">
-
-      <!-- Device Token & MQTT setup card -->
-      <div id="deviceTokenSection" class="card device-token-card">
-        <h3 class="section-title">&#x1F4F1; IoT Device Setup (Wokwi / MQTT)</h3>
-        <div class="device-token-body">
-          <div class="device-token-row">
-            <span class="dt-label">MQTT Broker:</span>
-            <code id="dtBroker" class="dt-value">—</code>
-          </div>
-          <div class="device-token-row">
-            <span class="dt-label">MQTT Topic:</span>
-            <code id="dtTopic" class="dt-value">—</code>
-          </div>
-          <div class="device-token-row">
-            <span class="dt-label">Device Token:</span>
-            <code id="dtToken" class="dt-value dt-token">—</code>
-            <button id="copyTokenBtn" class="btn-ghost btn-sm" title="Copy token">&#x1F4CB;</button>
-          </div>
-          <p class="dt-hint">Include your device token in every MQTT message as <code>deviceToken</code>. Keep it secret — anyone with the token can write to your account.</p>
-          <button id="rotateTokenBtn" class="btn-secondary btn-sm">&#x21BB; Generate / Rotate Token</button>
-        </div>
+    <!-- METRICS ROW -->
+    <section class="metrics-row" aria-label="Sensors">
+      <div class="metric" id="m-temperature">
+        <div class="metric-icon">🌡</div>
+        <div class="metric-name">Temp</div>
+        <div class="metric-value" id="v-temperature">--</div>
+        <div class="metric-status" id="s-temperature"><span class="status-dot"></span> <span class="status-text">—</span></div>
       </div>
 
-      <!-- Latest telemetry readings -->
-      <div id="telemetrySection" class="card">
-        <div class="chart-header">
-          <h3>&#x1F4E1; Latest Telemetry Readings</h3>
-          <button id="refreshTelemetryBtn" class="btn-secondary">&#x21BB; Refresh</button>
-        </div>
-        <div id="telemetryVisuals" class="telemetry-visuals">
-          <div class="telemetry-gauge-wrap">
-            <canvas id="telemetryGauge" aria-label="Current sensor gauge"></canvas>
-            <p id="telemetryGaugeValue" class="telemetry-gauge-value">No data</p>
-          </div>
-          <div class="telemetry-trend-wrap">
-            <canvas id="telemetryTrend" aria-label="Telemetry trend chart"></canvas>
-          </div>
-
-          <!-- Small gauges for Wokwi sensors (inserted) -->
-          <div class="telemetry-small-gauges" aria-label="Sensor gauges">
-            <div class="small-gauge">
-              <canvas id="gaugeTempSmall" aria-label="Temperature gauge small"></canvas>
-              <p class="gauge-label">🌡 Temp</p>
-            </div>
-            <div class="small-gauge">
-              <canvas id="gaugeHumiditySmall" aria-label="Humidity gauge small"></canvas>
-              <p class="gauge-label">💧 Humidity</p>
-            </div>
-            <div class="small-gauge">
-              <canvas id="gaugeMotionSmall" aria-label="Motion gauge small"></canvas>
-              <p class="gauge-label">🚶 Motion</p>
-            </div>
-            <div class="small-gauge">
-              <canvas id="gaugeDistanceSmall" aria-label="Distance gauge small"></canvas>
-              <p class="gauge-label">📏 Distance</p>
-            </div>
-            <div class="small-gauge">
-              <canvas id="gaugeLightSmall" aria-label="Light gauge small"></canvas>
-              <p class="gauge-label">💡 Light</p>
-            </div>
-          </div>
-
-        </div>
-        <div id="telemetryTableWrap">
-          <p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>
-        </div>
+      <div class="metric" id="m-humidity">
+        <div class="metric-icon">💧</div>
+        <div class="metric-name">Humidity</div>
+        <div class="metric-value" id="v-humidity">--</div>
+        <div class="metric-status" id="s-humidity"><span class="status-dot"></span> <span class="status-text">—</span></div>
       </div>
 
-      <!-- Combined chart card -->
-      <div class="card" id="combinedChartCard">
-        <div class="chart-header"><h3>All Sensors — Trend</h3></div>
-        <div style="height:220px;">
-          <canvas id="combinedSensorsChart" aria-label="Combined sensors trend"></canvas>
+      <div class="metric" id="m-motion">
+        <div class="metric-icon">🚶</div>
+        <div class="metric-name">Motion</div>
+        <div class="metric-value" id="v-motion">--</div>
+        <div class="metric-status" id="s-motion"><span class="status-dot"></span> <span class="status-text">—</span></div>
+      </div>
+
+      <div class="metric" id="m-distance">
+        <div class="metric-icon">📏</div>
+        <div class="metric-name">Distance</div>
+        <div class="metric-value" id="v-distance">--</div>
+        <div class="metric-status" id="s-distance"><span class="status-dot"></span> <span class="status-text">—</span></div>
+      </div>
+
+      <div class="metric" id="m-light">
+        <div class="metric-icon">💡</div>
+        <div class="metric-name">Light</div>
+        <div class="metric-value" id="v-light">--</div>
+        <div class="metric-status" id="s-light"><span class="status-dot"></span> <span class="status-text">—</span></div>
+      </div>
+    </section>
+
+    <!-- BIG CHART -->
+    <section class="chart-section">
+      <div class="chart-header">
+        <h2>BIG TELEMETRY CHART</h2>
+        <div class="chart-controls">
+          <button id="refreshBtn" class="btn">Refresh</button>
+          <span id="lastUpdated" class="muted">No data</span>
         </div>
       </div>
+      <div class="chart-card">
+        <canvas id="combinedChart" aria-label="Combined sensors chart"></canvas>
+      </div>
+    </section>
 
-      <!-- KPI summary cards (populated by JS after load) -->
-      <div id="kpiCards" class="kpi-grid hidden"></div>
-
-      <!-- Charts section -->
-      <div id="chartsSection" class="hidden">
-        <div class="card chart-card">
-          <div class="chart-header">
-            <h3>Health Trends — Today</h3>
-            <button id="loadSummaryBtn" class="btn-secondary">&#x21BB; Refresh</button>
-          </div>
-          <div class="chart-grid">
-            <div class="chart-wrap">
-              <canvas id="chartTemp" aria-label="Temperature chart"></canvas>
-              <p class="chart-label">🌡 Temperature (°C)</p>
-            </div>
-            <div class="chart-wrap">
-              <canvas id="chartHR" aria-label="Heart rate chart"></canvas>
-              <p class="chart-label">💓 Heart Rate (bpm)</p>
-            </div>
-            <div class="chart-wrap">
-              <canvas id="chartSpo2" aria-label="SpO2 chart"></canvas>
-              <p class="chart-label">🩸 SpO2 (%)</p>
-            </div>
-          </div>
+    <!-- Device Token -->
+    <section class="token-section">
+      <div class="token-card glass">
+        <div class="token-row"><strong>MQTT Broker:</strong> <span id="dtBroker">—</span></div>
+        <div class="token-row"><strong>MQTT Topic:</strong> <span id="dtTopic">—</span></div>
+        <div class="token-row">
+          <strong>Device Token:</strong>
+          <input id="dtToken" readonly class="token-input" value="—" />
+          <button id="copyToken" class="btn">Copy</button>
+          <button id="rotateToken" class="btn warning">Rotate</button>
         </div>
+        <div class="muted">Use the device token in MQTT payload as <code>deviceToken</code>.</div>
       </div>
+    </section>
 
-      <!-- Empty state shown when no data yet -->
-      <div id="emptyState" class="card empty-state hidden">
-        <div class="empty-icon">📡</div>
-        <h3>No sensor data for today</h3>
-        <p>Connect your IoT device and publish readings to see health trends here.</p>
-        <button id="loadSummaryBtnEmpty" class="btn-primary">Load Summary</button>
+    <!-- TABLE -->
+    <section class="table-section">
+      <h3>DEVICE HISTORY TABLE</h3>
+      <div class="table-wrap">
+        <table id="telemetryTable">
+          <thead>
+            <tr>
+              <th>Time</th><th>Device</th><th>Temp</th><th>Humidity</th><th>Motion</th><th>Dist</th><th>Light</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="7" class="muted">No telemetry yet.</td></tr>
+          </tbody>
+        </table>
       </div>
-
-      <!-- Admin section -->
-      <div id="adminControls" class="hidden">
-        <div class="card">
-          <h3 class="section-title">&#x1F6E1; Admin Actions</h3>
-          <div class="row">
-            <button id="listUsersBtn" class="btn-secondary">List Users</button>
-            <button id="sendDailyEmailsBtn" class="btn-secondary">Send Daily Emails</button>
-          </div>
-          <pre id="adminOutput"></pre>
-        </div>
-      </div>
-
-    </main>
-  </section>
+    </section>
+  </div>
 
   <script src="/app.js"></script>
 </body>
