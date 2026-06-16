@@ -1,98 +1,60 @@
-/* existing stylesheet content ... (kept original and appended overrides) */
-:root {
-  --primary: #4f46e5;
-  --primary-dark: #3730a3;
-  --primary-light: #8b8df6;
-  --accent: #06b6d4;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+/* (append the following to the end of your existing styles.css) */
 
-  --bg: #f5f7ff;
-  --bg-alt: #edf2ff;
-  --surface: rgba(255, 255, 255, 0.9);
-  --surface-strong: #ffffff;
-  --surface2: #f5f8ff;
-  --text: #1b2559;
-  --text-muted: #64748b;
-  --border: rgba(90, 111, 255, 0.15);
-  --chart-track: #e7ecff;
-
-  --shadow-sm: 0 6px 20px rgba(66, 74, 155, 0.12);
-  --shadow-md: 0 14px 36px rgba(66, 74, 155, 0.18);
-  --shadow-lg: 0 24px 56px rgba(66, 74, 155, 0.24);
-
-  --radius: 18px;
-  --radius-sm: 12px;
-  --glass-blur: blur(10px);
-
-  --topbar-bg: linear-gradient(95deg, #4f46e5 0%, #7c3aed 48%, #06b6d4 100%);
-  --topbar-text: #f8fbff;
-  --surface-hover: #ecf2ff;
-  --focus-ring: rgba(79, 70, 229, 0.3);
+/* Small gauges strip for telemetry visuals (added) */
+.telemetry-small-gauges {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+  align-items: center;
 }
 
-:root[data-theme='dark'] {
-  --primary: #8b8df6;
-  --primary-dark: #6366f1;
-  --primary-light: #a5b4fc;
-  --accent: #22d3ee;
-  --success: #34d399;
-  --warning: #fbbf24;
-
-  --bg: #060d20;
-  --bg-alt: #0b1329;
-  --surface: rgba(17, 25, 43, 0.84);
-  --surface-strong: #101a31;
-  --surface2: #1a2641;
-  --text: #ebf0ff;
-  --text-muted: #95a3c5;
-  --border: rgba(137, 155, 255, 0.25);
-  --chart-track: #2a3a60;
-
-  --shadow-sm: 0 8px 22px rgba(2, 6, 23, 0.45);
-  --shadow-md: 0 18px 38px rgba(2, 6, 23, 0.55);
-  --shadow-lg: 0 30px 60px rgba(2, 6, 23, 0.65);
-
-  --topbar-bg: linear-gradient(95deg, #222a6f 0%, #4d2c7b 52%, #0d657d 100%);
-  --surface-hover: #243457;
-  --focus-ring: rgba(139, 141, 246, 0.4);
-}
-
-* , *::before, *::after { box-sizing: border-box; margin:0; padding:0 }
-body { font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, Arial, sans-serif; }
-/* ... rest of original CSS kept ... */
-
-/* Overrides: show telemetry horizontally and make charts scrollable horizontally */
-.telemetry-visuals {
+.small-gauge {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px;
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 14px;
-  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  transition: transform 220ms ease, box-shadow 220ms ease;
 }
 
-.telemetry-gauge-wrap {
-  min-width: 260px;
-  max-width: 320px;
-  flex: 0 0 280px;
+.small-gauge:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-md);
 }
 
-.telemetry-trend-wrap {
-  flex: 1 1 0%;
-  min-width: 420px;
+.small-gauge canvas {
+  width: 100% !important;
+  height: 80px !important;
+  max-height: 90px;
 }
 
-/* Charts: make chart grid horizontal and scrollable so many sensors don't wrap awkwardly */
-.chart-grid {
-  display: flex;
-  gap: 18px;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  -webkit-overflow-scrolling: touch;
+.gauge-label {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: var(--text);
 }
 
-.chart-wrap {
-  min-width: 240px;
-  flex: 0 0 260px;
+/* Motion indicator style: show a rounded badge next to label when motion detected */
+.motion-badge {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-left: 8px;
+}
+
+/* Responsive: stack on narrow screens */
+@media (max-width: 880px) {
+  .telemetry-small-gauges {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .telemetry-small-gauges {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
