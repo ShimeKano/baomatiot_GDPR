@@ -1,3 +1,7 @@
+/* Full app.js with Wokwi sensors gauges + combined sensors chart integrated.
+   Copy/replace the repository's /app.js with this file.
+*/
+
 const tokenKey = 'iot_gdpr_token';
 const apiBaseKey = 'iot_gdpr_api_base';
 const themeKey = 'iot_gdpr_theme';
@@ -30,6 +34,14 @@ let telemetryRefreshTimer = null;
 let telemetryLoading = false;
 let latestTelemetryRecords = [];
 const TELEMETRY_REFRESH_MS = 5000;
+
+/* Small gauge instances and combined chart */
+let gaugeTempSmall = null;
+let gaugeHumiditySmall = null;
+let gaugeMotionSmall = null;
+let gaugeDistanceSmall = null;
+let gaugeLightSmall = null;
+let combinedSensorsChart = null;
 
 function getToken() {
   return localStorage.getItem(tokenKey);
@@ -156,7 +168,7 @@ function setUiLoggedOut() {
   if (telemetryWrap) telemetryWrap.innerHTML = '<p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>';
 }
 
-// ── Chart helpers ────────────────────────────────────────────
+// ── Chart helpers ───────────────────────────────────────────
 
 function destroyCharts() {
   if (chartTemp)  { chartTemp.destroy();  chartTemp = null; }
@@ -202,6 +214,13 @@ function destroyTelemetryVisualCharts() {
     telemetryTrendChart.destroy();
     telemetryTrendChart = null;
   }
+  // destroy small/combined charts too
+  if (gaugeTempSmall) { try { gaugeTempSmall.destroy(); } catch(e){} gaugeTempSmall = null; }
+  if (gaugeHumiditySmall) { try { gaugeHumiditySmall.destroy(); } catch(e){} gaugeHumiditySmall = null; }
+  if (gaugeMotionSmall) { try { gaugeMotionSmall.destroy(); } catch(e){} gaugeMotionSmall = null; }
+  if (gaugeDistanceSmall) { try { gaugeDistanceSmall.destroy(); } catch(e){} gaugeDistanceSmall = null; }
+  if (gaugeLightSmall) { try { gaugeLightSmall.destroy(); } catch(e){} gaugeLightSmall = null; }
+  if (combinedSensorsChart) { try { combinedSensorsChart.destroy(); } catch(e){} combinedSensorsChart = null; }
 }
 
 /* Render KPI cards and charts from the summaries array */
@@ -321,21 +340,48 @@ function renderTelemetryTable(records) {
     wrap.innerHTML = '<p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>';
     return;
   }
-  const rows = records.map((r) => `
-    <tr>
-      <td>${new Date(r.timestamp).toLocaleString()}</td>
-      <td>${r.deviceId || '—'}</td>
-      <td>${r.temperature !== null ? `${r.temperature} °C` : '—'}</td>
-      <td>${r.humidity !== null ? `${r.humidity} %` : '—'}</td>
-      <td>${r.heartRate !== null ? `${r.heartRate} bpm` : '—'}</td>
-      <td>${r.spo2 !== null ? `${r.spo2} %` : '—'}</td>
-    </tr>`).join('');
+
+  // Build union of all keys across records excluding internal fields
+  const exclude = new Set(['deviceToken', 'deviceId', 'timestamp']);
+  const keys = new Set();
+  records.forEach((r) => {
+    Object.keys(r).forEach((k) => {
+      if (!exclude.has(k)) keys.add(k);
+    });
+  });
+  const sensorKeys = Array.from(keys).sort();
+
+  // Build header row: Time, Device, <sensor keys...>
+  const headerCells = ['<th>Time</th>', '<th>Device</th>']
+    .concat(sensorKeys.map(k => `<th>${k}</th>`))
+    .join('');
+
+  // Build body rows
+  const rows = records.map((r) => {
+    const cells = [];
+    cells.push(`<td>${new Date(r.timestamp).toLocaleString()}</td>`);
+    cells.push(`<td>${r.deviceId || '—'}</td>`);
+    sensorKeys.forEach(k => {
+      const v = r[k];
+      const display = (v === null || v === undefined) ? '—' : (typeof v === 'number' ? v : String(v));
+      // Add unit hints for known sensors
+      let withUnit = display;
+      const lk = k.toLowerCase();
+      if (lk.includes('temp')) withUnit = `${display} °C`;
+      else if (lk.includes('humidity')) withUnit = `${display} %`;
+      else if (lk.includes('hr') || lk.includes('heartrate')) withUnit = `${display} bpm`;
+      else if (lk.includes('spo2')) withUnit = `${display} %`;
+      else if (lk.includes('distance')) withUnit = `${display} cm`;
+      else if (lk.includes('light')) withUnit = `${display}`;
+      cells.push(`<td>${withUnit}</td>`);
+    });
+    return `<tr>${cells.join('')}</tr>`;
+  }).join('');
+
   wrap.innerHTML = `
     <table class="telemetry-table">
       <thead>
-        <tr>
-          <th>Time</th><th>Device</th><th>Temp</th><th>Humidity</th><th>Heart Rate</th><th>SpO2</th>
-        </tr>
+        <tr>${headerCells}</tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
@@ -351,7 +397,6 @@ function renderTelemetryVisuals(records) {
     if (gaugeValue) gaugeValue.textContent = 'Chart unavailable';
     return;
   }
-
   if (!records || !records.length) {
     destroyTelemetryVisualCharts();
     if (gaugeValue) gaugeValue.textContent = 'No data';
@@ -359,25 +404,77 @@ function renderTelemetryVisuals(records) {
   }
 
   const latest = records[0];
-  const latestTemp = typeof latest.temperature === 'number' ? latest.temperature : null;
-  const latestHr = typeof latest.heartRate === 'number' ? latest.heartRate : null;
-  const latestSpo2 = typeof latest.spo2 === 'number' ? latest.spo2 : null;
-  const safeTemp = latestTemp !== null ? Math.min(Math.max(latestTemp, 0), 45) : 0;
-  const palette = getThemePalette();
 
+  // Determine sensor keys automatically (union across latest record)
+  const exclude = new Set(['deviceToken', 'deviceId', 'timestamp']);
+  const keys = new Set();
+  records.forEach(r => Object.keys(r).forEach(k => { if (!exclude.has(k)) keys.add(k); }));
+  const sensorKeys = Array.from(keys).sort();
+
+  // Choose colors for known sensors, fallback palette for others
+  const colorMap = {
+    temperature: '#f59e0b',
+    temp: '#f59e0b',
+    humidity: '#0ea5a3',
+    heartRate: '#ef4444',
+    hr: '#ef4444',
+    spo2: '#06b6d4',
+    respRate: '#8b5cf6',
+    bpsys: '#f97316',
+    bpdia: '#fb7185'
+  };
+  const fallbackColors = ['#6366f1','#10b981','#06b6d4','#f59e0b','#ef4444','#a78bfa','#34d399'];
+  let fallbackIndex = 0;
+
+  // Update gauge text to show latest sensors inline
   if (gaugeValue) {
-    gaugeValue.textContent = latestTemp !== null
-      ? `${latestTemp.toFixed(1)} °C  •  ${latestHr ?? '—'} bpm  •  ${latestSpo2 ?? '—'}%`
-      : 'No temperature value';
+    const parts = sensorKeys.map(k => {
+      const v = latest[k];
+      const s = (v === null || v === undefined) ? '—' : (typeof v === 'number' ? v : String(v));
+      return `${k}: ${s}`;
+    });
+    gaugeValue.textContent = parts.join('  •  ');
   }
 
+  // Build trend chart datasets
+  const ordered = [...records].reverse();
+  const labels = ordered.map((r) => new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+  const datasets = sensorKeys.map((k) => {
+    const keyLower = k.toLowerCase();
+    const mapped = colorMap[k] || colorMap[keyLower] || (fallbackColors[fallbackIndex++ % fallbackColors.length]);
+    return {
+      label: `${k}`,
+      data: ordered.map(r => (r[k] !== undefined ? (typeof r[k] === 'number' ? r[k] : null) : null)),
+      borderColor: mapped,
+      backgroundColor: mapped,
+      tension: 0.35,
+      spanGaps: true
+    };
+  });
+
+  // Make backgroundColor semi-transparent based on borderColor
+  datasets.forEach(ds => {
+    try {
+      const hex = ds.borderColor.replace('#','');
+      const bigint = parseInt(hex, 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      ds.backgroundColor = `rgba(${r}, ${g}, ${b}, 0.18)`;
+    } catch (e) {
+      ds.backgroundColor = 'rgba(99,102,241,0.12)';
+    }
+  });
+
+  // Destroy previous charts and create new
   if (telemetryGaugeChart) telemetryGaugeChart.destroy();
   telemetryGaugeChart = new Chart(gaugeCanvas.getContext('2d'), {
     type: 'doughnut',
     data: {
       datasets: [{
-        data: [safeTemp, 45 - safeTemp],
-        backgroundColor: ['#f59e0b', palette.track],
+        data: [1, 0], // minimal visual — gauge shows latest values textually now
+        backgroundColor: ['#f59e0b', getThemePalette().track],
         borderWidth: 0
       }]
     },
@@ -385,86 +482,40 @@ function renderTelemetryVisuals(records) {
       rotation: 270,
       circumference: 180,
       cutout: '72%',
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: false }
-      },
-      animation: { duration: 500 }
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      animation: { duration: 250 }
     }
   });
-
-  const ordered = [...records].reverse();
-  const labels = ordered.map((r) => new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
   if (telemetryTrendChart) telemetryTrendChart.destroy();
   telemetryTrendChart = new Chart(trendCanvas.getContext('2d'), {
     type: 'line',
     data: {
       labels,
-      datasets: [
-        {
-          label: 'Temp (°C)',
-          data: ordered.map((r) => (typeof r.temperature === 'number' ? r.temperature : null)),
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.2)',
-          tension: 0.35,
-          yAxisID: 'yTemp'
-        },
-        {
-          label: 'Heart Rate (bpm)',
-          data: ordered.map((r) => (typeof r.heartRate === 'number' ? r.heartRate : null)),
-          borderColor: '#ef4444',
-          backgroundColor: 'rgba(239, 68, 68, 0.2)',
-          tension: 0.35,
-          yAxisID: 'yVital'
-        },
-        {
-          label: 'SpO2 (%)',
-          data: ordered.map((r) => (typeof r.spo2 === 'number' ? r.spo2 : null)),
-          borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6, 182, 212, 0.2)',
-          tension: 0.35,
-          yAxisID: 'yVital'
-        }
-      ]
+      datasets
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { color: palette.textMuted }
-        }
-      },
+      plugins: { legend: { position: 'bottom', labels: { color: getThemePalette().textMuted } } },
       scales: {
-        x: {
-          ticks: { maxTicksLimit: 6, color: palette.textMuted },
-          grid: { color: palette.border }
-        },
-        yTemp: {
-          type: 'linear',
-          position: 'left',
-          suggestedMin: 34,
-          suggestedMax: 40,
-          title: { display: true, text: '°C', color: palette.textMuted },
-          ticks: { color: palette.textMuted },
-          grid: { color: palette.border }
-        },
-        yVital: {
-          type: 'linear',
-          position: 'right',
-          suggestedMin: 50,
-          suggestedMax: 120,
-          grid: { drawOnChartArea: false, color: palette.border },
-          title: { display: true, text: 'bpm / %', color: palette.textMuted },
-          ticks: { color: palette.textMuted }
-        }
+        x: { ticks: { maxTicksLimit: 6, color: getThemePalette().textMuted }, grid: { color: getThemePalette().border } },
+        y: { ticks: { color: getThemePalette().textMuted }, grid: { color: getThemePalette().border } }
       }
     }
   });
+
+  // update new small gauges & combined chart
+  try {
+    renderSmallGauges(records);
+    renderCombinedSensorsChart(records);
+  } catch (e) {
+    console.warn('Small gauges/chart update failed', e);
+  }
 }
+
+// ── Device Token & Telemetry helpers continued (existing code) ──
 
 function startTelemetryAutoRefresh() {
   stopTelemetryAutoRefresh();
@@ -497,7 +548,104 @@ async function loadTelemetry() {
   }
 }
 
-// ── Event listeners ──────────────────────────────────────────
+// --- START: Small gauges & combined sensors chart helpers ---
+
+function safeNumber(val) {
+  if (val === null || val === undefined) return null;
+  const n = Number(val);
+  return Number.isFinite(n) ? n : null;
+}
+
+function destroySmallGauges() {
+  if (gaugeTempSmall) { try { gaugeTempSmall.destroy(); } catch(e){} gaugeTempSmall = null; }
+  if (gaugeHumiditySmall) { try { gaugeHumiditySmall.destroy(); } catch(e){} gaugeHumiditySmall = null; }
+  if (gaugeMotionSmall) { try { gaugeMotionSmall.destroy(); } catch(e){} gaugeMotionSmall = null; }
+  if (gaugeDistanceSmall) { try { gaugeDistanceSmall.destroy(); } catch(e){} gaugeDistanceSmall = null; }
+  if (gaugeLightSmall) { try { gaugeLightSmall.destroy(); } catch(e){} gaugeLightSmall = null; }
+}
+
+function renderSmallGauges(records) {
+  if (!records || !records.length) {
+    destroySmallGauges();
+    return;
+  }
+  const latest = records[0];
+
+  const temp = safeNumber(latest.temperature);
+  const humidity = safeNumber(latest.humidity);
+  const motion = (latest.motion !== undefined) ? (latest.motion ? 1 : 0) : null;
+  const distance = safeNumber(latest.distance);
+  const light = safeNumber(latest.light);
+
+  // destroy previous
+  destroySmallGauges();
+
+  // create gauges when present (use existing buildGauge)
+  try {
+    if (document.getElementById('gaugeTempSmall')) gaugeTempSmall = buildGauge('gaugeTempSmall', temp, 45, '#f59e0b');
+    if (document.getElementById('gaugeHumiditySmall')) gaugeHumiditySmall = buildGauge('gaugeHumiditySmall', humidity, 100, '#0ea5a3');
+    if (motion !== null && document.getElementById('gaugeMotionSmall')) gaugeMotionSmall = buildGauge('gaugeMotionSmall', motion, 1, motion === 1 ? '#10b981' : '#94a3b8');
+    if (document.getElementById('gaugeDistanceSmall')) gaugeDistanceSmall = buildGauge('gaugeDistanceSmall', distance, 500, '#8b5cf6');
+    if (document.getElementById('gaugeLightSmall')) gaugeLightSmall = buildGauge('gaugeLightSmall', light, 4095, '#f97316');
+  } catch (e) {
+    console.warn('Failed to create small gauges', e);
+  }
+}
+
+function renderCombinedSensorsChart(records) {
+  const canvas = document.getElementById('combinedSensorsChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  if (combinedSensorsChart) {
+    try { combinedSensorsChart.destroy(); } catch(e) {}
+    combinedSensorsChart = null;
+  }
+  if (!records || !records.length) return;
+
+  const exclude = new Set(['deviceToken','deviceId','timestamp']);
+  const keys = new Set();
+  records.forEach(r => Object.keys(r).forEach(k => { if (!exclude.has(k) && typeof r[k] === 'number') keys.add(k); }));
+  const sensorKeys = Array.from(keys).sort();
+  const ordered = [...records].reverse();
+  const labels = ordered.map(r => {
+    const d = r.timestamp ? new Date(r.timestamp) : new Date();
+    return d.toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', second:'2-digit' });
+  });
+
+  const palette = ['#f59e0b','#0ea5a3','#ef4444','#06b6d4','#8b5cf6','#a78bfa','#34d399'];
+  let idx = 0;
+  const datasets = sensorKeys.map(k => {
+    const ds = {
+      label: k,
+      data: ordered.map(r => (typeof r[k] === 'number' ? r[k] : null)),
+      borderColor: palette[idx % palette.length],
+      backgroundColor: palette[idx % palette.length],
+      tension: 0.3,
+      spanGaps: true
+    };
+    idx++;
+    return ds;
+  });
+
+  combinedSensorsChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 6 } },
+        y: { beginAtZero: false }
+      }
+    }
+  });
+}
+
+// --- END: Small gauges & combined sensors chart helpers ---
+
+// ── Event listeners and bootstrap (unchanged) ──
 
 document.getElementById('rotateTokenBtn').addEventListener('click', rotateDeviceToken);
 
@@ -598,6 +746,7 @@ document.getElementById('sendDailyEmailsBtn').addEventListener('click', async ()
 
   try {
     const result = await api('/api/auth/me');
+    setToken(result.token); // ensure token is consistent
     setUiAuthenticated(result.user);
   } catch (_error) {
     clearToken();
