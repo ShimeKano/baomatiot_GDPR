@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>IOT cloud</title>
+  <title>IoT GDPR Healthcare</title>
   <link rel="stylesheet" href="/styles.css" />
   <!-- Chart.js for data visualisation -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
@@ -19,7 +19,7 @@
         </div>
         <div class="login-header">
           <div class="login-icon">&#x2764;&#xFE0F;</div>
-          <h1>IOT cloud</h1>
+          <h1>IoT Healthcare</h1>
           <p>GDPR-compliant sensor dashboard</p>
         </div>
         <div class="login-body">
@@ -47,7 +47,7 @@
     <header class="topbar">
       <div class="topbar-brand">
         <span class="topbar-icon">&#x2764;&#xFE0F;</span>
-        <span class="topbar-title">IOT cloud</span>
+        <span class="topbar-title">IoT Healthcare Dashboard</span>
       </div>
       <div class="topbar-user">
         <span id="meInfo" class="user-chip"></span>
@@ -95,31 +95,6 @@
           <div class="telemetry-trend-wrap">
             <canvas id="telemetryTrend" aria-label="Telemetry trend chart"></canvas>
           </div>
-
-          <!-- Small gauges added for Wokwi sensors (temperature, humidity, motion, distance, light) -->
-          <div class="telemetry-small-gauges">
-            <div class="small-gauge">
-              <canvas id="gaugeTempSmall" aria-label="Temperature gauge small"></canvas>
-              <p class="gauge-label">🌡 Temp</p>
-            </div>
-            <div class="small-gauge">
-              <canvas id="gaugeHumiditySmall" aria-label="Humidity gauge small"></canvas>
-              <p class="gauge-label">💧 Humidity</p>
-            </div>
-            <div class="small-gauge">
-              <canvas id="gaugeMotionSmall" aria-label="Motion gauge small"></canvas>
-              <p class="gauge-label">🚶 Motion</p>
-            </div>
-            <div class="small-gauge">
-              <canvas id="gaugeDistanceSmall" aria-label="Distance gauge small"></canvas>
-              <p class="gauge-label">📏 Distance</p>
-            </div>
-            <div class="small-gauge">
-              <canvas id="gaugeLightSmall" aria-label="Light gauge small"></canvas>
-              <p class="gauge-label">💡 Light</p>
-            </div>
-          </div>
-
         </div>
         <div id="telemetryTableWrap">
           <p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>
