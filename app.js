@@ -2,7 +2,7 @@
 // Place at repo root and referenced by index.html
 
 // CONFIG
-const API_BASE = ''; // if backend on other host, set e.g. 'https://api.example.com'
+const API_BASE = 'gdprapi-dwdehpbzaedrbdcj.eastasia-01.azurewebsites.net'; // if backend on other host, set e.g. 'https://api.example.com'
 const TELEMETRY_URL = `${API_BASE}/api/telemetry?limit=40`;
 const AUTH_LOGIN = `${API_BASE}/api/auth/login`;
 const AUTH_ME = `${API_BASE}/api/auth/me`;
