@@ -1,3 +1,6 @@
+// Full app.js with added small-gauges integration for Wokwi sensors.
+// (This file preserves existing logic and adds gauge helpers for: temperature, humidity, motion, distance, light)
+
 const tokenKey = 'iot_gdpr_token';
 const apiBaseKey = 'iot_gdpr_api_base';
 const themeKey = 'iot_gdpr_theme';
@@ -30,6 +33,13 @@ let telemetryRefreshTimer = null;
 let telemetryLoading = false;
 let latestTelemetryRecords = [];
 const TELEMETRY_REFRESH_MS = 5000;
+
+// Small gauge chart instances (added)
+let gaugeTempSmall = null;
+let gaugeHumiditySmall = null;
+let gaugeMotionSmall = null;
+let gaugeDistanceSmall = null;
+let gaugeLightSmall = null;
 
 function getToken() {
   return localStorage.getItem(tokenKey);
@@ -156,7 +166,7 @@ function setUiLoggedOut() {
   if (telemetryWrap) telemetryWrap.innerHTML = '<p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>';
 }
 
-// ── Chart helpers ────────────────────────────────────────────
+// ── Chart helpers ───────────────────────────────────────────
 
 function destroyCharts() {
   if (chartTemp)  { chartTemp.destroy();  chartTemp = null; }
@@ -202,6 +212,12 @@ function destroyTelemetryVisualCharts() {
     telemetryTrendChart.destroy();
     telemetryTrendChart = null;
   }
+  // also destroy small gauges added
+  if (gaugeTempSmall) { gaugeTempSmall.destroy(); gaugeTempSmall = null; }
+  if (gaugeHumiditySmall) { gaugeHumiditySmall.destroy(); gaugeHumiditySmall = null; }
+  if (gaugeMotionSmall) { gaugeMotionSmall.destroy(); gaugeMotionSmall = null; }
+  if (gaugeDistanceSmall) { gaugeDistanceSmall.destroy(); gaugeDistanceSmall = null; }
+  if (gaugeLightSmall) { gaugeLightSmall.destroy(); gaugeLightSmall = null; }
 }
 
 /* Render KPI cards and charts from the summaries array */
@@ -352,6 +368,8 @@ function renderTelemetryTable(records) {
       else if (lk.includes('humidity')) withUnit = `${display} %`;
       else if (lk.includes('hr') || lk.includes('heartrate')) withUnit = `${display} bpm`;
       else if (lk.includes('spo2')) withUnit = `${display} %`;
+      else if (lk.includes('distance')) withUnit = `${display} cm`;
+      else if (lk.includes('light')) withUnit = `${display}`;
       cells.push(`<td>${withUnit}</td>`);
     });
     return `<tr>${cells.join('')}</tr>`;
@@ -484,6 +502,13 @@ function renderTelemetryVisuals(records) {
       }
     }
   });
+
+  // Render small gauges for common Wokwi sensors (added)
+  try {
+    renderSmallGauges(records);
+  } catch (e) {
+    console.warn('Failed to render small gauges', e);
+  }
 }
 
 // ── Device Token & Telemetry helpers continued (existing code) ──
@@ -517,6 +542,43 @@ async function loadTelemetry() {
   } finally {
     telemetryLoading = false;
   }
+}
+
+// Small gauges helper functions (added)
+function safeNumber(val) {
+  if (val === null || val === undefined) return null;
+  const n = Number(val);
+  return Number.isFinite(n) ? n : null;
+}
+
+function renderSmallGauges(records) {
+  if (!records || !records.length) {
+    // nothing to show
+    return;
+  }
+  const latest = records[0];
+  const temp = safeNumber(latest.temperature);
+  const humidity = safeNumber(latest.humidity);
+  const motion = (latest.motion !== undefined) ? (latest.motion ? 1 : 0) : null;
+  const distance = safeNumber(latest.distance);
+  const light = safeNumber(latest.light);
+
+  // destroy previous
+  if (gaugeTempSmall) { gaugeTempSmall.destroy(); gaugeTempSmall = null; }
+  if (gaugeHumiditySmall) { gaugeHumiditySmall.destroy(); gaugeHumiditySmall = null; }
+  if (gaugeMotionSmall) { gaugeMotionSmall.destroy(); gaugeMotionSmall = null; }
+  if (gaugeDistanceSmall) { gaugeDistanceSmall.destroy(); gaugeDistanceSmall = null; }
+  if (gaugeLightSmall) { gaugeLightSmall.destroy(); gaugeLightSmall = null; }
+
+  // create gauges when present
+  gaugeTempSmall = buildGauge('gaugeTempSmall', temp, 45, '#f59e0b');
+  gaugeHumiditySmall = buildGauge('gaugeHumiditySmall', humidity, 100, '#0ea5a3');
+  if (motion !== null) {
+    // motion: map 0..1 (show as filled or empty) with green when detected
+    gaugeMotionSmall = buildGauge('gaugeMotionSmall', motion, 1, motion === 1 ? '#10b981' : '#94a3b8');
+  }
+  gaugeDistanceSmall = buildGauge('gaugeDistanceSmall', distance, 400, '#8b5cf6');
+  gaugeLightSmall = buildGauge('gaugeLightSmall', light, 4095, '#f97316');
 }
 
 // ── Event listeners and bootstrap (unchanged) ──
