@@ -95,6 +95,31 @@
           <div class="telemetry-trend-wrap">
             <canvas id="telemetryTrend" aria-label="Telemetry trend chart"></canvas>
           </div>
+
+          <!-- Small gauges added for Wokwi sensors (temperature, humidity, motion, distance, light) -->
+          <div class="telemetry-small-gauges">
+            <div class="small-gauge">
+              <canvas id="gaugeTempSmall" aria-label="Temperature gauge small"></canvas>
+              <p class="gauge-label">🌡 Temp</p>
+            </div>
+            <div class="small-gauge">
+              <canvas id="gaugeHumiditySmall" aria-label="Humidity gauge small"></canvas>
+              <p class="gauge-label">💧 Humidity</p>
+            </div>
+            <div class="small-gauge">
+              <canvas id="gaugeMotionSmall" aria-label="Motion gauge small"></canvas>
+              <p class="gauge-label">🚶 Motion</p>
+            </div>
+            <div class="small-gauge">
+              <canvas id="gaugeDistanceSmall" aria-label="Distance gauge small"></canvas>
+              <p class="gauge-label">📏 Distance</p>
+            </div>
+            <div class="small-gauge">
+              <canvas id="gaugeLightSmall" aria-label="Light gauge small"></canvas>
+              <p class="gauge-label">💡 Light</p>
+            </div>
+          </div>
+
         </div>
         <div id="telemetryTableWrap">
           <p class="hint">No telemetry data yet. Connect your Wokwi device and publish readings.</p>
