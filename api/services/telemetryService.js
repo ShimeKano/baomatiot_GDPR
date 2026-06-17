@@ -91,9 +91,15 @@ function ingestTelemetry(userId, payload) {
     deviceId: typeof payload.deviceId === 'string' ? payload.deviceId.trim() : DEFAULT_DEVICE_ID,
     temperature: Number.isFinite(Number(payload.temperature)) ? Number(payload.temperature) : null,
     humidity: Number.isFinite(Number(payload.humidity)) ? Number(payload.humidity) : null,
-    heartRate: Number.isFinite(Number(payload.heartRate)) ? Number(payload.heartRate) : null,
-    spo2: Number.isFinite(Number(payload.spo2)) ? Number(payload.spo2) : null,
-
+    motion: Number.isFinite(Number(payload.motion))
+      ? Number(payload.motion)
+      : null,
+    distance: Number.isFinite(Number(payload.distance))
+      ? Number(payload.distance)
+      : null,
+    light: Number.isFinite(Number(payload.light))
+      ? Number(payload.light)
+      : null,
     // FIX: never crash on invalid timestamp
     timestamp: safeIsoTimestamp(payload.timestamp),
 
