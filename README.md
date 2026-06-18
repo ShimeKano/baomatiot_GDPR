@@ -1,159 +1,189 @@
-# IoT GDPR Healthcare (Azure Static Web Apps compatible)
+IoT CI/CD Deployment System using GitHub Actions
+Project Overview
 
-This project provides a complete Node.js/Express API under `/api` and a static frontend at repository root (`index.html`, `app.js`, `styles.css`).
+This project demonstrates the application of Continuous Integration and Continuous Deployment (CI/CD) in an IoT monitoring system. The system uses ESP32 and multiple sensors simulated on Wokwi to collect environmental data, which is transmitted via MQTT and displayed on a cloud-hosted web dashboard.
 
-## Features
+The project is deployed automatically using GitHub Actions and Microsoft Azure, providing a practical example of DevOps practices in IoT environments.
 
-- Email login with JWT-based authentication.
-- Role model:
-  - Default admin email: `22004249@st.vlute.edu.vn`
-  - Any other email defaults to role `user`
-  - Admin can promote users to admin.
-- Auth + role middleware for protected endpoints.
-- Sensor ingestion:
-  - HTTP endpoint (`POST /api/sensors/ingest`)
-  - MQTT subscriber ingestion (broker/topic via env)
-- **Per-user telemetry via MQTT (Wokwi / ESP32 devices):**
-  - Each user generates a private device token (rotatable).
-  - Devices publish JSON messages to MQTT; server maps token → user and persists data under `data/telemetry/{userId}.json`.
-  - Atomic writes prevent file corruption.
-- Daily sensor summary endpoint.
-- Daily email summary scheduler (Asia/Ho_Chi_Minh timezone), idempotent per user/day.
-- Admin manual trigger for daily emails.
-- JSON-file persistence (`data/store.json`, per-user `data/telemetry/`).
+System Architecture
+ESP32 + Sensors (Wokwi)
+          │
+          ▼
+      MQTT Broker
+          │
+          ▼
+     Node.js Backend
+          │
+          ▼
+    Telemetry Storage
+          │
+          ▼
+      Web Dashboard
 
-## API Endpoints
+Deployment Architecture:
 
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-- `GET /api/users` (admin)
-- `POST /api/users/:id/promote` (admin)
-- `POST /api/sensors/ingest` (protected)
-- `GET /api/sensors/daily-summary` (user/admin scoped)
-- `POST /api/admin/send-daily-emails` (admin manual trigger)
-- `POST /api/telemetry/token` — create or rotate device token (JWT required)
-- `GET /api/telemetry/token` — retrieve current device token + MQTT connection info (JWT required)
-- `GET /api/telemetry` — retrieve latest telemetry records for the authenticated user (JWT required, `?limit=N`)
+Developer
+    │
+    ▼
+ GitHub Repository
+    │
+    ▼
+ GitHub Actions
+ ┌──────┴──────┐
+ ▼             ▼
+Frontend     Backend
+Azure SWA    Azure App Service
+Features
+IoT Monitoring
+Temperature monitoring (DHT22)
+Humidity monitoring (DHT22)
+Motion detection (PIR)
+Distance measurement (HC-SR04)
+Light intensity monitoring (LDR)
+User Management
+JWT Authentication
+Role-based Access Control
+Admin/User accounts
+Device Token Management
+MQTT Telemetry
+ESP32 publishes sensor data through MQTT
+Device token based user mapping
+Per-user telemetry storage
+Real-time dashboard updates
+CI/CD Automation
+Automatic build on push
+Automatic deployment to Azure
+GitHub Actions workflow
+Continuous Integration
+Continuous Deployment
+Technologies Used
+IoT
+ESP32
+DHT22
+PIR Sensor
+HC-SR04 Ultrasonic Sensor
+LDR Sensor
+MQTT
+Backend
+Node.js
+Express.js
+JWT Authentication
+Frontend
+HTML
+CSS
+JavaScript
+Cloud
+Microsoft Azure
+Azure App Service
+Azure Static Web Apps
+DevOps
+Git
+GitHub
+GitHub Actions
+CI/CD Pipeline
+MQTT Configuration
 
-## Environment Configuration
+Broker:
 
-Copy `.env` and adjust variables for JWT, MQTT, SMTP, and timezone settings.
+test.mosquitto.org
 
-Important variables:
+Port:
 
-- `JWT_SECRET`, `JWT_EXPIRES_IN`
-- `DEFAULT_ADMIN_EMAIL`
-- `MQTT_BROKER_URL` (default: `mqtt://test.mosquitto.org`)
-- `MQTT_TELEMETRY_TOPIC` (default: `iot/gdpr/telemetry`)
-- `MQTT_TOPIC` — optional legacy topic
-- `MQTT_USERNAME`, `MQTT_PASSWORD` — leave empty for test.mosquitto.org
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
-- `TZ=Asia/Ho_Chi_Minh`, `DAILY_EMAIL_HOUR`, `DAILY_EMAIL_MINUTE`
-- `DATA_FILE` (JSON persistence path)
+1883
 
-## Run locally
+Topic:
 
-```bash
+iot/gdpr/telemetry
+
+Payload Example:
+
+{
+  "deviceToken": "YOUR_DEVICE_TOKEN",
+  "deviceId": "wokwi-esp32-01",
+  "temperature": 28.5,
+  "humidity": 70.2,
+  "motion": 1,
+  "distance": 52.4,
+  "light": 1320
+}
+API Endpoints
+
+Authentication:
+
+POST /api/auth/login
+GET  /api/auth/me
+
+Users:
+
+GET  /api/users
+POST /api/users/:id/promote
+
+Telemetry:
+
+GET  /api/telemetry
+GET  /api/telemetry/token
+POST /api/telemetry/token
+
+Sensors:
+
+POST /api/sensors/ingest
+GET  /api/sensors/daily-summary
+
+Admin:
+
+POST /api/admin/send-daily-emails
+Local Deployment
 npm install
 npm test
 npm start
-```
 
-Open `http://localhost:4280`.
+Application URL:
 
-## Azure Static Web Apps deployment
+http://localhost:4280
+Azure Deployment
 
-Repository layout is compatible with Azure SWA using:
+Frontend:
 
-- Static frontend: `/`
-- API: `/api`
-- Routing/security headers: `staticwebapp.config.json`
+Azure Static Web Apps
 
-Typical SWA settings:
+Backend:
 
-- **App location**: `/`
-- **API location**: `/api`
-- **Output location**: *(leave empty for static files at root)*
+Azure App Service
 
-Set all required environment variables in Azure Static Web Apps Configuration.
+Deployment is fully automated using GitHub Actions.
 
-## Wokwi / ESP32 IoT Device Setup
+Whenever code is pushed to the main branch:
 
-Follow these steps to connect a simulated (or real) ESP32 to the dashboard using [Wokwi](https://wokwi.com/).
+GitHub Actions executes the workflow.
+Application is built automatically.
+Deployment to Azure is triggered automatically.
+Updated version becomes available online.
+Wokwi Simulation
 
-### 1. Recommended sensors in Wokwi
+The project uses Wokwi to simulate:
 
-| Sensor | Wokwi Part | Readings published |
-|--------|------------|--------------------|
-| DHT22 | `wokwi-dht22` | `temperature` (°C), `humidity` (%) |
-| MAX30102 (simulated via potentiometers) | manual | `heartRate` (bpm), `spo2` (%) |
+ESP32
+DHT22
+PIR
+HC-SR04
+LDR
 
-### 2. MQTT broker
+The provided sketch publishes telemetry data every 5 seconds through MQTT.
 
-Use the **free public broker** `test.mosquitto.org` (no account required):
+Educational Purpose
 
-| Setting | Value |
-|---------|-------|
-| Host | `test.mosquitto.org` |
-| Port (plain) | `1883` |
-| Port (TLS) | `8883` |
-| Authentication | None required |
+This project was developed for the course:
 
-### 3. Topic format
+Cloud Computing Applications in IoT
 
-All devices publish to a **single shared topic**:
+Topic:
 
-```
-iot/gdpr/telemetry
-```
+Application of CI/CD for Automated IoT System Deployment using GitHub Actions
 
-The backend identifies the user by a `deviceToken` field **inside the payload**.
+README này phù hợp hơn nhiều với báo cáo đề tài của bạn vì nó thể hiện rõ:
 
-### 4. Payload JSON shape
-
-```json
-{
-  "deviceToken": "<your-device-token>",
-  "deviceId":    "esp32-wokwi-1",
-  "temperature": 36.8,
-  "humidity":    55.2,
-  "heartRate":   75,
-  "spo2":        98,
-  "timestamp":   "2025-01-15T08:30:00Z"
-}
-```
-
-All sensor fields are optional but at least one should be present. `timestamp` is optional (server will use current time if omitted).
-
-### 5. Generate your device token
-
-1. Log in to the dashboard at `http://localhost:4280` (or your deployment URL).
-2. In the **IoT Device Setup** card, click **Generate / Rotate Token**.
-3. Copy the token displayed and paste it into your Wokwi sketch.
-
-### 6. Wokwi sketch
-
-A ready-to-use ESP32 Arduino sketch is provided in [`wokwi.txt`](./wokwi.txt).
-
-> **Note:** Wokwi's typical sketch filename is `sketch.ino`. Because this repository stores it as `wokwi.txt`, follow these steps:
-> 1. Open [https://wokwi.com/projects/new/esp32](https://wokwi.com/projects/new/esp32)
-> 2. Click the **sketch.ino** tab.
-> 3. Select all existing code and delete it.
-> 4. Open `wokwi.txt` from this repository, copy all its content.
-> 5. Paste into the Wokwi sketch editor.
-> 6. Replace `YOUR_DEVICE_TOKEN_HERE` with the token you generated in step 5.
-> 7. Click **▶ Start Simulation**.
-
-### 7. View your data
-
-After the simulation starts, return to the dashboard and click **↻ Refresh** in the **Latest Telemetry Readings** section. New readings appear within seconds.
-
-## GDPR-minded retention configuration
-
-No plaintext secrets are hard-coded. Configure retention operationally by periodically deleting old entries from JSON store or external DB. Recommended policy (adjust for compliance):
-
-- Telemetry files: `data/telemetry/{userId}.json` — retain 30-90 days.
-- Sensor records: retain 30-90 days.
-- Daily email logs: retain 180 days to preserve idempotency audit trail.
-- Rotate `JWT_SECRET`, device tokens, MQTT, and SMTP credentials regularly.
-- Device tokens can be rotated at any time via `POST /api/telemetry/token`.
+IoT
+MQTT
+Azure
+GitHub Actions
+CI/CD
