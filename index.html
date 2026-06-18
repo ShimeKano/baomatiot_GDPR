@@ -1,44 +1,117 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>IoT GDPR Healthcare</title>
+  <title>IoT Monitoring Dashboard</title>
+
   <link rel="stylesheet" href="/styles.css" />
+
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <main class="container">
-    <h1>IoT GDPR Healthcare Dashboard</h1>
-
-    <section id="loginSection" class="card">
-      <h2>Login</h2>
-      <form id="loginForm">
-        <label>Email <input id="email" type="email" required /></label>
-        <label>Password <input id="password" type="password" minlength="6" required /></label>
-        <button type="submit">Login</button>
-      </form>
-      <p class="hint">Default admin email: 22004249@st.vlute.edu.vn</p>
-    </section>
-
-    <section id="dashboardSection" class="card hidden">
-      <h2>Dashboard</h2>
-      <p id="meInfo"></p>
-
-      <div class="row">
-        <button id="loadSummaryBtn">Load Daily Summary</button>
-        <button id="logoutBtn">Logout</button>
+  <div class="app container">
+    <header class="header">
+      <div>
+        <h1 class="title">IoT Monitoring Dashboard</h1>
+        <p class="subtitle">Live telemetry — same API logic as before</p>
       </div>
 
-      <pre id="summaryOutput"></pre>
+      <div id="authArea" class="auth-area">
+        <!-- Login form will be injected if not authenticated -->
+        <form id="loginForm" class="login-form" novalidate>
+          <input id="email" type="email" placeholder="email" required />
+          <input id="password" type="password" placeholder="password" required />
+          <button id="loginBtn" type="submit" class="btn primary">Sign in</button>
+        </form>
+      </div>
+    </header>
 
-      <div id="adminControls" class="hidden">
-        <h3>Admin Actions</h3>
-        <button id="listUsersBtn">List Users</button>
-        <button id="sendDailyEmailsBtn">Send Daily Emails</button>
-        <pre id="adminOutput"></pre>
+    <!-- METRICS ROW -->
+    <section class="metrics-row" aria-label="Sensors">
+      <div class="metric" id="m-temperature">
+        <div class="metric-icon">🌡</div>
+        <div class="metric-name">Temp</div>
+        <div class="metric-value" id="v-temperature">--</div>
+        <div class="metric-status" id="s-temperature"><span class="status-dot"></span> <span class="status-text">—</span></div>
+      </div>
+
+      <div class="metric" id="m-humidity">
+        <div class="metric-icon">💧</div>
+        <div class="metric-name">Humidity</div>
+        <div class="metric-value" id="v-humidity">--</div>
+        <div class="metric-status" id="s-humidity"><span class="status-dot"></span> <span class="status-text">—</span></div>
+      </div>
+
+      <div class="metric" id="m-motion">
+        <div class="metric-icon">🚶</div>
+        <div class="metric-name">Motion</div>
+        <div class="metric-value" id="v-motion">--</div>
+        <div class="metric-status" id="s-motion"><span class="status-dot"></span> <span class="status-text">—</span></div>
+      </div>
+
+      <div class="metric" id="m-distance">
+        <div class="metric-icon">📏</div>
+        <div class="metric-name">Distance</div>
+        <div class="metric-value" id="v-distance">--</div>
+        <div class="metric-status" id="s-distance"><span class="status-dot"></span> <span class="status-text">—</span></div>
+      </div>
+
+      <div class="metric" id="m-light">
+        <div class="metric-icon">💡</div>
+        <div class="metric-name">Light</div>
+        <div class="metric-value" id="v-light">--</div>
+        <div class="metric-status" id="s-light"><span class="status-dot"></span> <span class="status-text">—</span></div>
       </div>
     </section>
-  </main>
+
+    <!-- BIG CHART -->
+    <section class="chart-section">
+      <div class="chart-header">
+        <h2>BIG TELEMETRY CHART</h2>
+        <div class="chart-controls">
+          <button id="refreshBtn" class="btn">Refresh</button>
+          <span id="lastUpdated" class="muted">No data</span>
+        </div>
+      </div>
+      <div class="chart-card">
+        <canvas id="combinedChart" aria-label="Combined sensors chart"></canvas>
+      </div>
+    </section>
+
+    <!-- Device Token -->
+    <section class="token-section">
+      <div class="token-card glass">
+        <div class="token-row"><strong>MQTT Broker:</strong> <span id="dtBroker">—</span></div>
+        <div class="token-row"><strong>MQTT Topic:</strong> <span id="dtTopic">—</span></div>
+        <div class="token-row">
+          <strong>Device Token:</strong>
+          <input id="dtToken" readonly class="token-input" value="—" />
+          <button id="copyToken" class="btn">Copy</button>
+          <button id="rotateToken" class="btn warning">Rotate</button>
+        </div>
+        <div class="muted">Use the device token in MQTT payload as <code>deviceToken</code>.</div>
+      </div>
+    </section>
+
+    <!-- TABLE -->
+    <section class="table-section">
+      <h3>DEVICE HISTORY TABLE</h3>
+      <div class="table-wrap">
+        <table id="telemetryTable">
+          <thead>
+            <tr>
+              <th>Time</th><th>Device</th><th>Temp</th><th>Humidity</th><th>Motion</th><th>Dist</th><th>Light</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="7" class="muted">No telemetry yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 
   <script src="/app.js"></script>
 </body>

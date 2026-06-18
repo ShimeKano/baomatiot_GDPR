@@ -7,7 +7,8 @@ const resolvedFile = path.resolve(process.cwd(), dataFile);
 const initialData = {
   users: [],
   sensorRecords: [],
-  dailyEmailLogs: []
+  dailyEmailLogs: [],
+  deviceTokens: []
 };
 
 function ensureFile() {
@@ -28,7 +29,8 @@ function readData() {
     return {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       sensorRecords: Array.isArray(parsed.sensorRecords) ? parsed.sensorRecords : [],
-      dailyEmailLogs: Array.isArray(parsed.dailyEmailLogs) ? parsed.dailyEmailLogs : []
+      dailyEmailLogs: Array.isArray(parsed.dailyEmailLogs) ? parsed.dailyEmailLogs : [],
+      deviceTokens: Array.isArray(parsed.deviceTokens) ? parsed.deviceTokens : []
     };
   } catch (error) {
     return { ...initialData };
@@ -40,7 +42,8 @@ function writeData(data) {
   const payload = {
     users: Array.isArray(data.users) ? data.users : [],
     sensorRecords: Array.isArray(data.sensorRecords) ? data.sensorRecords : [],
-    dailyEmailLogs: Array.isArray(data.dailyEmailLogs) ? data.dailyEmailLogs : []
+    dailyEmailLogs: Array.isArray(data.dailyEmailLogs) ? data.dailyEmailLogs : [],
+    deviceTokens: Array.isArray(data.deviceTokens) ? data.deviceTokens : []
   };
   fs.writeFileSync(resolvedFile, JSON.stringify(payload, null, 2));
 }

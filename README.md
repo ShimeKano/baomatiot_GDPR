@@ -1,80 +1,284 @@
-# IoT GDPR Healthcare (Azure Static Web Apps compatible)
+# IoT CI/CD Deployment System using GitHub Actions
 
-This project provides a complete Node.js/Express API under `/api` and a static frontend at repository root (`index.html`, `app.js`, `styles.css`).
+## Project Overview
+
+This project demonstrates the implementation of Continuous Integration and Continuous Deployment (CI/CD) in an IoT monitoring system. The system collects environmental data from multiple sensors connected to an ESP32 microcontroller simulated on Wokwi. Sensor data is transmitted through MQTT, processed by a Node.js backend, stored for historical tracking, and displayed on a cloud-hosted web dashboard.
+
+The project integrates GitHub Actions and Microsoft Azure to automate testing, building, and deployment processes, providing a practical example of DevOps practices applied to IoT systems.
+
+---
+
+## System Architecture
+
+### IoT Data Flow
+
+```text
+ESP32 + Sensors (Wokwi)
+          │
+          ▼
+      MQTT Broker
+          │
+          ▼
+     Node.js Backend
+          │
+          ▼
+   Telemetry Storage
+          │
+          ▼
+      Web Dashboard
+```
+
+### CI/CD Deployment Flow
+
+```text
+Developer
+    │
+    ▼
+GitHub Repository
+    │
+    ▼
+GitHub Actions
+ ┌──────┴──────┐
+ ▼             ▼
+Frontend     Backend
+Azure SWA    Azure App Service
+```
+
+---
 
 ## Features
 
-- Email login with JWT-based authentication.
-- Role model:
-  - Default admin email: `22004249@st.vlute.edu.vn`
-  - Any other email defaults to role `user`
-  - Admin can promote users to admin.
-- Auth + role middleware for protected endpoints.
-- Sensor ingestion:
-  - HTTP endpoint (`POST /api/sensors/ingest`)
-  - MQTT subscriber ingestion (broker/topic via env)
-- Daily sensor summary endpoint.
-- Daily email summary scheduler (Asia/Ho_Chi_Minh timezone), idempotent per user/day.
-- Admin manual trigger for daily emails.
-- JSON-file persistence fallback (`data/store.json`).
+### IoT Monitoring
 
-## API Endpoints
+The system supports real-time monitoring of environmental data:
 
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-- `GET /api/users` (admin)
-- `POST /api/users/:id/promote` (admin)
-- `POST /api/sensors/ingest` (protected)
-- `GET /api/sensors/daily-summary` (user/admin scoped)
-- `POST /api/admin/send-daily-emails` (admin manual trigger)
+* Temperature monitoring (DHT22)
+* Humidity monitoring (DHT22)
+* Motion detection (PIR)
+* Distance measurement (HC-SR04)
+* Light intensity monitoring (LDR)
 
-## Environment Configuration
+### User Management
 
-Copy `.env.example` to `.env` and adjust:
+The platform includes authentication and user administration features:
 
-```bash
-cp .env.example .env
+* JWT Authentication
+* User Registration and Login
+* Role-Based Access Control
+* Admin/User Accounts
+* Device Token Management
+
+### MQTT Telemetry
+
+Sensor data is transmitted using MQTT:
+
+* ESP32 publishes telemetry data
+* Device token based ownership mapping
+* Per-user telemetry history
+* Real-time dashboard updates
+* Last sensor update tracking
+
+### CI/CD Automation
+
+The deployment process is fully automated:
+
+* Automatic build on code push
+* GitHub Actions workflow execution
+* Continuous Integration
+* Continuous Deployment
+* Automatic Azure deployment
+
+---
+
+## Technologies Used
+
+### IoT Layer
+
+* ESP32
+* DHT22 Temperature & Humidity Sensor
+* PIR Motion Sensor
+* HC-SR04 Ultrasonic Sensor
+* LDR Light Sensor
+* MQTT Protocol
+
+### Backend
+
+* Node.js
+* Express.js
+* JWT Authentication
+* REST API
+
+### Frontend
+
+* HTML5
+* CSS3
+* JavaScript
+
+### Cloud Platform
+
+* Microsoft Azure
+* Azure App Service
+* Azure Static Web Apps
+
+### DevOps
+
+* Git
+* GitHub
+* GitHub Actions
+* CI/CD Pipeline
+
+---
+
+## MQTT Configuration
+
+### Broker
+
+```text
+test.mosquitto.org
 ```
 
-Important variables:
+### Port
 
-- `JWT_SECRET`, `JWT_EXPIRES_IN`
-- `DEFAULT_ADMIN_EMAIL`
-- `MQTT_BROKER_URL`, `MQTT_TOPIC`, `MQTT_USERNAME`, `MQTT_PASSWORD`
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
-- `TZ=Asia/Ho_Chi_Minh`, `DAILY_EMAIL_HOUR`, `DAILY_EMAIL_MINUTE`
-- `DATA_FILE` (JSON persistence path)
+```text
+1883
+```
 
-## Run locally
+### Topic
+
+```text
+iot/gdpr/telemetry
+```
+
+### Payload Example
+
+```json
+{
+  "deviceToken": "YOUR_DEVICE_TOKEN",
+  "deviceId": "wokwi-esp32-01",
+  "temperature": 28.5,
+  "humidity": 70.2,
+  "motion": 1,
+  "distance": 52.4,
+  "light": 1320
+}
+```
+
+---
+
+## REST API Endpoints
+
+### Authentication
+
+```http
+POST /api/auth/login
+GET  /api/auth/me
+```
+
+### Users
+
+```http
+GET  /api/users
+POST /api/users/:id/promote
+```
+
+### Telemetry
+
+```http
+GET  /api/telemetry
+GET  /api/telemetry/token
+POST /api/telemetry/token
+```
+
+### Sensors
+
+```http
+POST /api/sensors/ingest
+GET  /api/sensors/daily-summary
+```
+
+### Administration
+
+```http
+POST /api/admin/send-daily-emails
+```
+
+---
+
+## Local Deployment
+
+### Install Dependencies
 
 ```bash
 npm install
+```
+
+### Run Tests
+
+```bash
 npm test
+```
+
+### Start Application
+
+```bash
 npm start
 ```
 
-Open `http://localhost:4280`.
+### Access Application
 
-## Azure Static Web Apps deployment
+```text
+http://localhost:4280
+```
 
-Repository layout is compatible with Azure SWA using:
+---
 
-- Static frontend: `/`
-- API: `/api`
-- Routing/security headers: `staticwebapp.config.json`
+## Azure Deployment
 
-Typical SWA settings:
+### Frontend Hosting
 
-- **App location**: `/`
-- **API location**: `/api`
-- **Output location**: *(leave empty for static files at root)*
+* Azure Static Web Apps
 
-Set all required environment variables in Azure Static Web Apps Configuration.
+### Backend Hosting
 
-## GDPR-minded retention configuration
+* Azure App Service
 
-No plaintext secrets are hard-coded. Configure retention operationally by periodically deleting old entries from JSON store or external DB. Recommended policy (adjust for compliance):
+Deployment is fully automated through GitHub Actions.
 
-- Sensor records: retain 30-90 days.
-- Daily email logs: retain 180 days to preserve idempotency audit trail.
-- Rotate `JWT_SECRET`, MQTT, and SMTP credentials regularly.
+Whenever changes are pushed to the main branch:
+
+1. GitHub Actions starts the workflow.
+2. Dependencies are installed automatically.
+3. Build and validation steps are executed.
+4. Frontend is deployed to Azure Static Web Apps.
+5. Backend is deployed to Azure App Service.
+6. Updated services become available online.
+
+---
+
+## Wokwi Simulation
+
+The project uses Wokwi for hardware simulation and testing.
+
+Simulated devices include:
+
+* ESP32
+* DHT22
+* PIR Sensor
+* HC-SR04 Sensor
+* LDR Sensor
+
+The ESP32 sketch publishes telemetry data every 5 seconds through MQTT, allowing end-to-end testing without physical hardware.
+
+---
+
+## Educational Purpose
+
+This project was developed for the course:
+
+**Cloud Computing Applications in IoT**
+
+### Project Topic
+
+**Application of CI/CD for Automated IoT System Deployment using GitHub Actions**
+
+---
