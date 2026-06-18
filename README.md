@@ -1,11 +1,18 @@
-IoT CI/CD Deployment System using GitHub Actions
-Project Overview
+# IoT CI/CD Deployment System using GitHub Actions
 
-This project demonstrates the application of Continuous Integration and Continuous Deployment (CI/CD) in an IoT monitoring system. The system uses ESP32 and multiple sensors simulated on Wokwi to collect environmental data, which is transmitted via MQTT and displayed on a cloud-hosted web dashboard.
+## Project Overview
 
-The project is deployed automatically using GitHub Actions and Microsoft Azure, providing a practical example of DevOps practices in IoT environments.
+This project demonstrates the implementation of Continuous Integration and Continuous Deployment (CI/CD) in an IoT monitoring system. The system collects environmental data from multiple sensors connected to an ESP32 microcontroller simulated on Wokwi. Sensor data is transmitted through MQTT, processed by a Node.js backend, stored for historical tracking, and displayed on a cloud-hosted web dashboard.
 
-System Architecture
+The project integrates GitHub Actions and Microsoft Azure to automate testing, building, and deployment processes, providing a practical example of DevOps practices applied to IoT systems.
+
+---
+
+## System Architecture
+
+### IoT Data Flow
+
+```text
 ESP32 + Sensors (Wokwi)
           │
           ▼
@@ -15,88 +22,136 @@ ESP32 + Sensors (Wokwi)
      Node.js Backend
           │
           ▼
-    Telemetry Storage
+   Telemetry Storage
           │
           ▼
       Web Dashboard
+```
 
-Deployment Architecture:
+### CI/CD Deployment Flow
 
+```text
 Developer
     │
     ▼
- GitHub Repository
+GitHub Repository
     │
     ▼
- GitHub Actions
+GitHub Actions
  ┌──────┴──────┐
  ▼             ▼
 Frontend     Backend
 Azure SWA    Azure App Service
-Features
-IoT Monitoring
-Temperature monitoring (DHT22)
-Humidity monitoring (DHT22)
-Motion detection (PIR)
-Distance measurement (HC-SR04)
-Light intensity monitoring (LDR)
-User Management
-JWT Authentication
-Role-based Access Control
-Admin/User accounts
-Device Token Management
-MQTT Telemetry
-ESP32 publishes sensor data through MQTT
-Device token based user mapping
-Per-user telemetry storage
-Real-time dashboard updates
-CI/CD Automation
-Automatic build on push
-Automatic deployment to Azure
-GitHub Actions workflow
-Continuous Integration
-Continuous Deployment
-Technologies Used
-IoT
-ESP32
-DHT22
-PIR Sensor
-HC-SR04 Ultrasonic Sensor
-LDR Sensor
-MQTT
-Backend
-Node.js
-Express.js
-JWT Authentication
-Frontend
-HTML
-CSS
-JavaScript
-Cloud
-Microsoft Azure
-Azure App Service
-Azure Static Web Apps
-DevOps
-Git
-GitHub
-GitHub Actions
-CI/CD Pipeline
-MQTT Configuration
+```
 
-Broker:
+---
 
+## Features
+
+### IoT Monitoring
+
+The system supports real-time monitoring of environmental data:
+
+* Temperature monitoring (DHT22)
+* Humidity monitoring (DHT22)
+* Motion detection (PIR)
+* Distance measurement (HC-SR04)
+* Light intensity monitoring (LDR)
+
+### User Management
+
+The platform includes authentication and user administration features:
+
+* JWT Authentication
+* User Registration and Login
+* Role-Based Access Control
+* Admin/User Accounts
+* Device Token Management
+
+### MQTT Telemetry
+
+Sensor data is transmitted using MQTT:
+
+* ESP32 publishes telemetry data
+* Device token based ownership mapping
+* Per-user telemetry history
+* Real-time dashboard updates
+* Last sensor update tracking
+
+### CI/CD Automation
+
+The deployment process is fully automated:
+
+* Automatic build on code push
+* GitHub Actions workflow execution
+* Continuous Integration
+* Continuous Deployment
+* Automatic Azure deployment
+
+---
+
+## Technologies Used
+
+### IoT Layer
+
+* ESP32
+* DHT22 Temperature & Humidity Sensor
+* PIR Motion Sensor
+* HC-SR04 Ultrasonic Sensor
+* LDR Light Sensor
+* MQTT Protocol
+
+### Backend
+
+* Node.js
+* Express.js
+* JWT Authentication
+* REST API
+
+### Frontend
+
+* HTML5
+* CSS3
+* JavaScript
+
+### Cloud Platform
+
+* Microsoft Azure
+* Azure App Service
+* Azure Static Web Apps
+
+### DevOps
+
+* Git
+* GitHub
+* GitHub Actions
+* CI/CD Pipeline
+
+---
+
+## MQTT Configuration
+
+### Broker
+
+```text
 test.mosquitto.org
+```
 
-Port:
+### Port
 
+```text
 1883
+```
 
-Topic:
+### Topic
 
+```text
 iot/gdpr/telemetry
+```
 
-Payload Example:
+### Payload Example
 
+```json
 {
   "deviceToken": "YOUR_DEVICE_TOKEN",
   "deviceId": "wokwi-esp32-01",
@@ -106,84 +161,132 @@ Payload Example:
   "distance": 52.4,
   "light": 1320
 }
-API Endpoints
+```
 
-Authentication:
+---
 
+## REST API Endpoints
+
+### Authentication
+
+```http
 POST /api/auth/login
 GET  /api/auth/me
+```
 
-Users:
+### Users
 
+```http
 GET  /api/users
 POST /api/users/:id/promote
+```
 
-Telemetry:
+### Telemetry
 
+```http
 GET  /api/telemetry
 GET  /api/telemetry/token
 POST /api/telemetry/token
+```
 
-Sensors:
+### Sensors
 
+```http
 POST /api/sensors/ingest
 GET  /api/sensors/daily-summary
+```
 
-Admin:
+### Administration
 
+```http
 POST /api/admin/send-daily-emails
-Local Deployment
+```
+
+---
+
+## Local Deployment
+
+### Install Dependencies
+
+```bash
 npm install
+```
+
+### Run Tests
+
+```bash
 npm test
+```
+
+### Start Application
+
+```bash
 npm start
+```
 
-Application URL:
+### Access Application
 
+```text
 http://localhost:4280
-Azure Deployment
+```
 
-Frontend:
+---
 
-Azure Static Web Apps
+## Azure Deployment
 
-Backend:
+### Frontend Hosting
 
-Azure App Service
+* Azure Static Web Apps
 
-Deployment is fully automated using GitHub Actions.
+### Backend Hosting
 
-Whenever code is pushed to the main branch:
+* Azure App Service
 
-GitHub Actions executes the workflow.
-Application is built automatically.
-Deployment to Azure is triggered automatically.
-Updated version becomes available online.
-Wokwi Simulation
+Deployment is fully automated through GitHub Actions.
 
-The project uses Wokwi to simulate:
+Whenever changes are pushed to the main branch:
 
-ESP32
-DHT22
-PIR
-HC-SR04
-LDR
+1. GitHub Actions starts the workflow.
+2. Dependencies are installed automatically.
+3. Build and validation steps are executed.
+4. Frontend is deployed to Azure Static Web Apps.
+5. Backend is deployed to Azure App Service.
+6. Updated services become available online.
 
-The provided sketch publishes telemetry data every 5 seconds through MQTT.
+---
 
-Educational Purpose
+## Wokwi Simulation
+
+The project uses Wokwi for hardware simulation and testing.
+
+Simulated devices include:
+
+* ESP32
+* DHT22
+* PIR Sensor
+* HC-SR04 Sensor
+* LDR Sensor
+
+The ESP32 sketch publishes telemetry data every 5 seconds through MQTT, allowing end-to-end testing without physical hardware.
+
+---
+
+## Educational Purpose
 
 This project was developed for the course:
 
-Cloud Computing Applications in IoT
+**Cloud Computing Applications in IoT**
 
-Topic:
+### Project Topic
 
-Application of CI/CD for Automated IoT System Deployment using GitHub Actions
+**Application of CI/CD for Automated IoT System Deployment using GitHub Actions**
 
-README này phù hợp hơn nhiều với báo cáo đề tài của bạn vì nó thể hiện rõ:
+---
 
-IoT
-MQTT
-Azure
-GitHub Actions
-CI/CD
+## Author
+
+**Nguyen Quoc Tuan**
+
+Faculty of Information Technology
+
+Industrial University of Ho Chi Minh City (IUH)
