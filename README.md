@@ -282,11 +282,3 @@ This project was developed for the course:
 **Application of CI/CD for Automated IoT System Deployment using GitHub Actions**
 
 ---
-
-## Author
-
-**Nguyen Quoc Tuan**
-
-Faculty of Information Technology
-
-Industrial University of Ho Chi Minh City (IUH)
